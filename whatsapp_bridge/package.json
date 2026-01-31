@@ -1,0 +1,16 @@
+{
+  "name": "liteclaw-wa-bridge",
+  "version": "1.0.0",
+  "description": "WhatsApp Bridge for LiteClaw",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "express": "^4.18.2",
+    "node-telegram-bot-api": "^0.67.0",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.23.0"
+  }
+}

@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic-settings
+openai
+python-dotenv
+litellm
+json_repair
+rich
+questionary
+selenium
+httpx

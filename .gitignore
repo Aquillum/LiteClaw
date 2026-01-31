@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+.env
+
+# Project Specific
+config.json
+liteclaw_memory.db
+*.png
+temp_script.ps1
+
+# Node.js (Bridge)
+whatsapp_bridge/node_modules/
+whatsapp_bridge/.npm
+whatsapp_bridge/.wwebjs_auth/
+whatsapp_bridge/.wwebjs_cache/
+whatsapp_session/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
