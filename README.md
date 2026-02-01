@@ -1,64 +1,152 @@
-# 🚀 LiteClaw
+# 🦞 LiteClaw
 
-Lightweight AI Agent Bridge with Adaptive Personality. LiteClaw integrates your AI with messaging platforms (WhatsApp, Telegram, Slack) and allows it to perform browser automation, shell execution, and more.
+**Lightweight AI Agent Bridge with Adaptive Personality**
 
-## 🛠️ Setup Instructions
+LiteClaw is a sophisticated AI agent gateway that connects LLMs to your world through messaging platforms (WhatsApp, Telegram, Slack) and enables powerful capabilities like browser automation, shell execution, and proactive task management.
 
-To share this repo and run it in a clean virtual environment, follow these steps:
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
-### 1. Clone the Repository
+## ✨ Features
+
+- 🤖 **Multi-LLM Support**: Works with OpenAI, OpenRouter, Groq, DeepSeek, and local models (Ollama)
+- 📱 **WhatsApp Integration**: Chat with your AI agent via WhatsApp (QR code pairing)
+- 🌐 **Browser Automation**: Powered by `browser-use` for web tasks
+- 💓 **Proactive Heartbeat**: Define periodic autonomous tasks in `HEARTBEAT.md`
+- 🧠 **Adaptive Personality**: Soul/Personality memory that evolves over time
+- 🔧 **Shell Execution**: Run terminal commands safely
+- 📅 **Cron Jobs**: Schedule recurring tasks via API
+- 🧵 **Sub-Agents**: Delegate long-running tasks to background agents
+
+## 🚀 Quick Start
+
+### 1. Install LiteClaw
+
 ```bash
-git clone <your-repo-url>
+# Clone the repository
+git clone https://github.com/Pr0fe5s0r/LiteClaw.git
 cd LiteClaw
-```
 
-### 2. Create a Virtual Environment
-We recommend using `python -m venv` or `uv` for speed.
-
-**Using venv:**
-```bash
+# Create virtual environment
 python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# Linux/Mac
-source .venv/bin/activate
+source .venv/bin/activate  # Linux/Mac
+# .venv\Scripts\activate   # Windows
+
+# Install in development mode
+pip install -e .
 ```
 
-### 3. Install Dependencies
+### 2. Run Onboarding Wizard
+
 ```bash
-pip install -r requirements.txt
+liteclaw onboard
 ```
 
-**Note for Browser Automation:**
-If you plan to use `browser-use`, you must install the Playwright browsers:
-```bash
-playwright install
-```
+This interactive wizard will:
+- Set up your work directory (`~/liteclaw` on Mac/Linux, `C:\liteclaw` on Windows)
+- Configure your LLM provider and API key
+- Set up WhatsApp bridge (optional)
+- Pair WhatsApp via QR code
 
-### 4. Configuration
-1. Rename `.env.example` to `.env` and fill in your API keys.
-2. Ensure you have the Node.js bridge dependencies installed:
-```bash
-cd src/liteclaw/bridge
-npm install
-cd ../../../
-```
+### 3. Start the Agent
 
-### 5. Run LiteClaw
-```bash
-python -m src.liteclaw.cli run
-```
-Or, if you installed the package:
 ```bash
 liteclaw run
 ```
 
-## 🧠 Features
-- **Adaptive Personality**: Soul/Personality memory that evolves.
-- **Browser Automation**: Powered by `browser-use`.
-- **Proactive Heartbeat**: Define periodic tasks in `HEARTBEAT.md`.
-- **Multi-Platform**: Bridge to WhatsApp, Telegram, and Slack.
-- **Sub-Agents**: Delegate long-running tasks to background agents.
+## 📖 CLI Commands
 
-## 🛡️ License
-MIT
+| Command | Description |
+|---------|-------------|
+| `liteclaw onboard` | Run the setup wizard |
+| `liteclaw run` | Start the gateway (FastAPI + Node Bridge) |
+| `liteclaw run --no-bridge` | Start without the Node.js bridge |
+| `liteclaw config` | View current configuration |
+| `liteclaw status` | Check system status |
+
+## ⚙️ Configuration
+
+After onboarding, your config is stored in:
+- **Mac/Linux**: `~/liteclaw/config.json`
+- **Windows**: `C:\liteclaw\config.json`
+
+### Supported LLM Providers
+
+| Provider | Base URL |
+|----------|----------|
+| OpenAI | `https://api.openai.com/v1` |
+| OpenRouter | `https://openrouter.ai/api/v1` |
+| Groq | `https://api.groq.com/openai/v1` |
+| DeepSeek | `https://api.deepseek.com/v1` |
+| Ollama (Local) | `http://localhost:11434/v1` |
+
+### WhatsApp Setup
+
+1. During onboarding, select "WhatsApp (requires phone scan)"
+2. Scan the QR code with your WhatsApp mobile app
+3. Messages from your allowed numbers will be processed by the agent
+
+**Note**: Add your WhatsApp ID to `WHATSAPP_ALLOWED_NUMBERS` in config.json to filter who can interact with the bot.
+
+## 🏗️ Architecture
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────┐
+│   WhatsApp      │────▶│   Node Bridge    │────▶│   FastAPI   │
+│   (Phone)       │◀────│   (port 3040)    │◀────│  (port 8009)│
+└─────────────────┘     └──────────────────┘     └──────┬──────┘
+                                                        │
+                                                        ▼
+                                                 ┌─────────────┐
+                                                 │  LLM Agent  │
+                                                 │  (LiteLLM)  │
+                                                 └─────────────┘
+```
+
+## 📂 Project Structure
+
+```
+LiteClaw/
+├── src/liteclaw/
+│   ├── agent.py         # Main AI agent logic
+│   ├── cli.py           # CLI commands
+│   ├── config.py        # Settings management
+│   ├── main.py          # FastAPI application
+│   ├── memory.py        # Conversation memory
+│   ├── scheduler.py     # Cron job manager
+│   ├── tools.py         # Agent tools (shell, browser, etc.)
+│   ├── AGENT.md         # Agent personality/instructions
+│   ├── HEARTBEAT.md     # Proactive task definitions
+│   ├── SOUL.md          # Long-term memory
+│   └── bridge/          # Node.js WhatsApp bridge
+├── config.json          # Your configuration
+├── requirements.txt
+└── pyproject.toml
+```
+
+## 🔒 Security
+
+- **Allowed Numbers**: Only specified phone numbers can interact with the bot
+- **Loop Prevention**: Messages from the bot itself are ignored
+- **Safe Shell Execution**: Dangerous commands are filtered
+
+## 🛠️ Development
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run with hot reload
+liteclaw run
+```
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## 🙏 Credits
+
+- [LiteLLM](https://github.com/BerriAI/litellm) - Unified LLM API
+- [browser-use](https://github.com/browser-use/browser-use) - Browser automation
+- [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js) - WhatsApp Web API
+

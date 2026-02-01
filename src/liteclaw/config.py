@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     WORK_DIR: str = get_default_work_dir()
     
     LLM_PROVIDER: str = "openai"
-    LLM_API_KEY: str
+    LLM_API_KEY: str = ""  # Allow empty during onboarding
     LLM_MODEL: str = "gpt-4o"
     LLM_BASE_URL: Optional[str] = None
     

@@ -27,7 +27,8 @@ dependencies = [
     "browser-use",
     "langchain-openai",
     "PyYAML",
-    "click"
+    "click",
+    "apscheduler"
 ]
 
 [project.scripts]

@@ -100,8 +100,12 @@ async def handle_whatsapp_incoming(request: Request):
         allowed_list = settings.WHATSAPP_ALLOWED_NUMBERS
         if allowed_list:
             is_authorized = any(num in sender for num in allowed_list)
+            print(f"[Auth Check] Sender: {sender}, Allowed: {allowed_list}, Authorized: {is_authorized}")
             if not is_authorized:
+                print(f"[Auth] ❌ Unauthorized sender: {sender}")
                 return {"status": "ignored_unauthorized"}
+            else:
+                print(f"[Auth] ✅ Authorized sender: {sender}")
     
     # 1. Create/Get Session
     # Use the specific sender ID as the session_id so sub-agents can notify back

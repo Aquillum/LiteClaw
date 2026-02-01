@@ -12,3 +12,5 @@ httpx
 browser-use
 langchain-openai
 PyYAML
+apscheduler
+click
