@@ -94,7 +94,7 @@ def run(port, host, no_bridge):
                 if not os.path.isdir(node_modules):
                     console.print("[yellow]  > First run detected. Installing Node dependencies...[/yellow]")
                     try:
-                        subprocess.check_call(["npm", "install"], cwd=bridge_dir)
+                        subprocess.check_call(["npm", "install"], cwd=bridge_dir, shell=(os.name == 'nt'))
                         console.print("[green]  ✅ Dependencies installed.[/green]")
                     except subprocess.CalledProcessError:
                          console.print("[red]  ❌ Failed to run 'npm install'.[/red]")

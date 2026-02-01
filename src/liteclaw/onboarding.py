@@ -166,7 +166,7 @@ def pair_whatsapp(bridge_dir, work_dir, config_data):
     # Force UTF-8 for Windows consoles
     if platform.system() == "Windows":
         try:
-            subprocess.run(["chcp", "65001"], capture_output=True)
+            subprocess.run(["chcp", "65001"], capture_output=True, shell=(os.name == 'nt'))
             env["PYTHONIOENCODING"] = "utf-8"
         except: pass
 
@@ -311,7 +311,7 @@ def onboarding():
         if "WhatsApp (requires phone scan)" in bridge_config.get("WHATSAPP_TYPE", "") or config_data.get("WHATSAPP_TYPE"):
             if os.path.exists(bridge_dir) and not os.path.exists(os.path.join(bridge_dir, "node_modules")):
                 console.print("[blue]Pre-installing Bridge Dependencies...[/blue]")
-                subprocess.check_call(["npm", "install"], cwd=bridge_dir)
+                subprocess.check_call(["npm", "install"], cwd=bridge_dir, shell=(os.name == 'nt'))
             
             if questionary.confirm("\nPair WhatsApp via QR now?", default=True).ask():
                 auth_ok, discovered_ids = pair_whatsapp(bridge_dir, work_dir, config_data)
