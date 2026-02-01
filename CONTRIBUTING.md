@@ -49,7 +49,23 @@ We welcome Pull Requests! Whether it's a small bug fix or a major new bridge int
    ```
 4. **Create a Branch**: `git checkout -b feature/your-feature-name`
 5. **Make Changes**: Write your code and tests.
-6. **Submit**: Push to your fork and open a Pull Request.
+6. **Testing**:
+   Run the validation script to ensure your code is clean:
+   ```bash
+   python scripts/validate.py
+   ```
+7. **Submit**: Push to your fork and open a Pull Request.
+
+---
+
+## 🧪 Testing & CI
+
+We use **GitHub Actions** to automatically test every Pull Request. The workflow runs:
+1. **Syntax Checks**: Ensures valid Python code.
+2. **Import Integrity**: Verifies the package installs correctly.
+3. **Bridge Verification**: Checks Node.js bridge structure.
+
+You can run these same checks locally using `python scripts/validate.py`.
 
 ---
 
