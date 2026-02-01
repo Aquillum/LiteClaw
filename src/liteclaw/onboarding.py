@@ -129,7 +129,7 @@ def setup_bridges(current_config=None):
         limit = questionary.confirm("Limit WhatsApp numbers?", default=bool(current_config.get("WHATSAPP_ALLOWED_NUMBERS") if current_config else True)).ask()
         if limit:
             existing = ",".join(current_config.get("WHATSAPP_ALLOWED_NUMBERS", [])) if current_config else ""
-            nums = questionary.text("Allowed Numbers (comma-sep):", default=existing).ask()
+            nums = questionary.text("Allowed Numbers (comma-sep, without +):", default=existing).ask()
             if nums: config["WHATSAPP_ALLOWED_NUMBERS"] = [n.strip() for n in nums.split(",") if n.strip()]
 
     if "Telegram (requires Bot Token)" in bridges:
@@ -189,6 +189,7 @@ def pair_whatsapp(bridge_dir, work_dir, config_data):
         console.print("[dim]If the QR is still broken, look for 'qr.html' in your work directory.[/dim]")
         
         authenticated = False
+        discovered_ids = []
         
         while True:
             line = process.stdout.readline()
@@ -206,18 +207,41 @@ def pair_whatsapp(bridge_dir, work_dir, config_data):
             if "WhatsApp Client is ready!" in line or "Authenticated successfully!" in line:
                 authenticated = True
                 console.print("\n[bold green]✅ WhatsApp Paired Successfully![/bold green]")
-                break
-            
+                
+                # Discovery Mode
+                console.print("\n[bold yellow]🔍 ID Discovery Mode[/bold yellow]")
+                console.print("Please SEND A MESSAGE from your WhatsApp to LiteClaw now.")
+                console.print("This will let me capture your 'Real ID' automatically so you don't have to type it.")
+                console.print("[dim]Waiting for incoming message... (Press Ctrl+C to skip)[/dim]\n")
+                # Don't break, continue loop to catch messages
+                
+            if "[Incoming] From" in line:
+                # Format: [Incoming] From Name (ID): Body
+                import re
+                match = re.search(r"\(([^)]+)\):", line)
+                if match:
+                    found_id = match.group(1)
+                    if found_id not in discovered_ids:
+                        discovered_ids.append(found_id)
+                        console.print(f"\n[bold green]🎯 ID Captured: {found_id}[/bold green]")
+                        if questionary.confirm(f"Add '{found_id}' to authorized numbers?", default=True).ask():
+                            console.print(f"[dim]Added {found_id} to list.[/dim]")
+                        else:
+                            discovered_ids.remove(found_id)
+                        
+                        if not questionary.confirm("Capture another ID?", default=False).ask():
+                            break
+
             if process.poll() is not None: break
                 
-        time.sleep(2)
+        time.sleep(1)
         process.terminate()
         try:
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:
             process.kill()
             
-        return authenticated
+        return authenticated, discovered_ids
         
     except Exception as e:
         console.print(f"[red]Error during WhatsApp pairing: {e}[/red]")
@@ -290,7 +314,17 @@ def onboarding():
                 subprocess.check_call(["npm", "install"], cwd=bridge_dir)
             
             if questionary.confirm("\nPair WhatsApp via QR now?", default=True).ask():
-                pair_whatsapp(bridge_dir, work_dir, config_data)
+                auth_ok, discovered_ids = pair_whatsapp(bridge_dir, work_dir, config_data)
+                if auth_ok and discovered_ids:
+                    # Merge discovered IDs into config
+                    allowed = config_data.get("WHATSAPP_ALLOWED_NUMBERS", [])
+                    for d_id in discovered_ids:
+                        if d_id not in allowed:
+                            allowed.append(d_id)
+                    config_data["WHATSAPP_ALLOWED_NUMBERS"] = allowed
+                    
+                    # Save updated config
+                    save_config(config_data)
 
         console.print("\n[bold white]🚀 Ready! Run: liteclaw run[/bold white]")
 

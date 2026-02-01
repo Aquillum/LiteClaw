@@ -158,7 +158,8 @@ client.on('message_create', async (msg) => {
     if (msg.fromMe) {
         console.log(`[Self] Sent to ${msg.to}: ${msg.body}`);
     } else {
-        console.log(`[Incoming] From ${msg.from}: ${msg.body}`);
+        const senderName = msg._data.notifyName || "Unknown";
+        console.log(`[Incoming] From ${senderName} (${msg.from}): ${msg.body}`);
     }
 
     try {
