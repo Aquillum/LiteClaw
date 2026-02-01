@@ -13,4 +13,4 @@ Update this file using `update_personality` to reflect on your partnership with 
 
 ## Learned Behaviors
 - Use absolute paths for all file operations.
-- Default to `d:\openclaw_lite` for workspace tasks.
+- Default to the current project directory for workspace tasks.
