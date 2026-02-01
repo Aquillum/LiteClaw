@@ -23,6 +23,8 @@ whatsapp_bridge/.wwebjs_auth/
 whatsapp_bridge/.wwebjs_cache/
 whatsapp_session/
 src/liteclaw/bridge/node_modules/
+src/liteclaw/bridge/.wwebjs_cache/
+src/liteclaw/bridge/.wwebjs_auth/
 
 
 # IDEs
