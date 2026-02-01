@@ -362,13 +362,48 @@ async def _run_browser_task(task_description: str, session_id: str, platform: st
     print(f"[Browser] Goal: {task_description}")
     print(f"[Browser] Using fresh browser instance for this task (KeepOpen={keep_open})")
     
+    # Loop detection variables
+    visited_urls = []
+    loop_detected = False
+    
     try:
         result = await agent.run()
         final_result = result.final_result()
+        
+        # Check for loop patterns in browser history
+        try:
+            page = await browser.get_current_page()
+            if page and hasattr(result, 'history'):
+                # Track URLs visited
+                for item in result.history:
+                    if hasattr(item, 'url'):
+                        visited_urls.append(item.url)
+                
+                # Detect if same URL was visited 3+ times (loop indicator)
+                if visited_urls:
+                    url_counts = {}
+                    for url in visited_urls:
+                        url_counts[url] = url_counts.get(url, 0) + 1
+                    
+                    max_visits = max(url_counts.values())
+                    if max_visits >= 3:
+                        looping_url = [u for u, c in url_counts.items() if c >= 3][0]
+                        loop_detected = True
+                        print(f"[Browser] ⚠️ LOOP DETECTED: Visited '{looping_url}' {max_visits} times!")
+                        print(f"[Browser] 🧹 Clearing cookies and cache...")
+                        
+                        # Clear cookies
+                        context = page.context
+                        await context.clear_cookies()
+                        print(f"[Browser] ✅ Cookies cleared. Suggesting retry with fresh state.")
+                        final_result = f"⚠️ LOOP DETECTED: The browser kept visiting the same page repeatedly.\n\n🧹 I've cleared cookies and cache.\n\n💡 Suggested actions:\n1. Try a different approach to the task\n2. The site may require manual intervention\n3. Consider using a different tool if browser automation isn't working\n\nOriginal result: {final_result}"
+        except Exception as loop_check_err:
+            print(f"[Browser] Loop detection check failed (non-critical): {loop_check_err}")
+        
         print(f"[Browser] ✅ Task completed. Result length: {len(str(final_result)) if final_result else 0}")
         
         # Append clear message about screenshots to prevent duplication
-        if final_result and ("screenshot" in str(final_result).lower() or "sent" in str(final_result).lower()):
+        if final_result and (\"screenshot\" in str(final_result).lower() or \"sent\" in str(final_result).lower()):
             final_result = f"{final_result}\n\n[IMPORTANT: Any screenshots taken during this task were ALREADY SENT to the user. Do NOT call send_media to send them again.]"
         
         return final_result
