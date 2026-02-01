@@ -4,6 +4,9 @@
 
 LiteClaw is a sophisticated AI agent gateway that connects LLMs to your world through messaging platforms (WhatsApp, Telegram, Slack) and enables powerful capabilities like browser automation, shell execution, and proactive task management.
 
+> **Note**: LiteClaw is a lightweight, Python-based version of [OpenClaw](https://github.com/Pr0fe5s0r/OpenClaw), focusing on speed, modularity, and easy deployment while providing the core agentic capabilities.
+
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 

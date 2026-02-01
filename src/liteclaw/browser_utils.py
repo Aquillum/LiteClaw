@@ -187,6 +187,11 @@ async def _run_browser_task(task_description: str, session_id: str, platform: st
     3. **Resilience & Recovery**: If an error occurs (popups, slow loads, missing elements), analyze why and attempt ONE alternate "better" solution.
     4. **Extraction**: Ensure data is actually visible (scroll if needed) before extracting, but don't over-scroll.
     5. **Verify**: Briefly confirm success (e.g., check for a confirmation message) then finish.
+    6. **Be Creative & Flexible**: If one approach fails, try alternatives:
+       - Use built-in browser features (right-click menus, keyboard shortcuts)
+       - Try different UI elements that achieve the same goal
+       - Use workarounds (e.g., drag-and-drop, copy-paste, direct URLs)
+       - If file upload fails, try taking a screenshot with send_screenshot instead
     
     ## CRITICAL: WAITING FOR USER INPUT
     **NEVER complete the task if you need input from the user!**
@@ -351,11 +356,82 @@ async def _run_browser_task(task_description: str, session_id: str, platform: st
             traceback.print_exc()
             return ActionResult(extracted_content=f"Screenshot error: {str(e)}", error=str(e))
     
+    # Create a directory for dynamic file uploads
+    browser_files_dir = os.path.join(settings.WORK_DIR or os.getcwd(), "browser_files")
+    os.makedirs(browser_files_dir, exist_ok=True)
+    
+    # Track dynamically created files
+    dynamic_file_paths = []
+    
+    @tools.action('Save a screenshot of the current page to a file that can be uploaded to websites like WhatsApp. Returns the file path.')
+    async def save_screenshot_for_upload(filename: str = "screenshot.png") -> ActionResult:
+        """Save screenshot to a file that can be used for uploading to websites."""
+        import uuid
+        
+        try:
+            page = await browser.get_current_page()
+            if not page:
+                return ActionResult(extracted_content="Error: No browser page available", error="No page")
+            
+            # Ensure unique filename
+            if not filename.endswith('.png'):
+                filename = f"{filename}.png"
+            unique_filename = f"{uuid.uuid4().hex[:8]}_{filename}"
+            file_path = os.path.join(browser_files_dir, unique_filename)
+            
+            # Take screenshot - try different API versions
+            try:
+                # Try with path parameter (some versions)
+                await page.screenshot(path=file_path)
+            except TypeError:
+                # Fallback: get bytes and write manually
+                screenshot_bytes = await page.screenshot()
+                with open(file_path, 'wb') as f:
+                    f.write(screenshot_bytes)
+            
+            dynamic_file_paths.append(file_path)
+            print(f"[Browser] 📸 Screenshot saved for upload: {file_path}")
+            
+            return ActionResult(
+                extracted_content=f"Screenshot saved to: {file_path}\n\nYou can now use the browser's file upload functionality to upload this image. Click on the attachment/upload button in WhatsApp and use the file picker to select this file."
+            )
+            
+        except Exception as e:
+            print(f"[Browser] ❌ Save screenshot error: {e}")
+            return ActionResult(extracted_content=f"Error saving screenshot: {str(e)}", error=str(e))
+    
+    @tools.action('Get the path of a saved file that can be uploaded. Use this to get file paths for the upload_file action.')
+    async def get_uploadable_file(description: str = "any") -> ActionResult:
+        """List files available for upload from the browser_files directory."""
+        try:
+            files = os.listdir(browser_files_dir)
+            if not files:
+                return ActionResult(
+                    extracted_content="No files available for upload yet. Use 'save_screenshot_for_upload' first to create a screenshot that can be uploaded."
+                )
+            
+            file_list = "\n".join([os.path.join(browser_files_dir, f) for f in files])
+            return ActionResult(
+                extracted_content=f"Available files for upload:\n{file_list}\n\nUse the full file path above to upload via the file picker or upload_file action."
+            )
+            
+        except Exception as e:
+            return ActionResult(extracted_content=f"Error listing files: {str(e)}", error=str(e))
+    
+    # Collect all available file paths (pre-existing + dynamic directory)
+    available_paths = [browser_files_dir]  # Allow access to entire directory
+    
+    # Also add any existing files in the directory
+    if os.path.exists(browser_files_dir):
+        for f in os.listdir(browser_files_dir):
+            available_paths.append(os.path.join(browser_files_dir, f))
+    
     agent = Agent(
         task=final_task,
         llm=llm,
         browser=browser,
-        tools=tools  # Enable human interaction and screenshot
+        tools=tools,  # Enable human interaction and screenshot
+        available_file_paths=available_paths  # Allow file uploads from browser_files directory
     )
     
     print(f"\n[Browser] Starting Smart Task (Headless={headless}, SecurityDisable={disable_security}, Exec={executable_path})")

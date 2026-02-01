@@ -272,8 +272,17 @@ class LiteClawAgent:
         self.base_url = settings.LLM_BASE_URL
         self.provider = settings.LLM_PROVIDER
         
-        if self.provider == "openai" and not self.model.startswith("openai/"):
-            self.full_model_name = f"openai/{self.model}"
+        if self.provider == "openai":
+            if self.base_url and "api.openai.com" not in self.base_url:
+                # For OpenAI Proxies (like OpenRouter), we always prepend 'openai/' 
+                # to the model string so LiteLLM uses the OpenAI handler but 
+                # sends the full model name as expected by the proxy.
+                self.full_model_name = f"openai/{self.model}"
+            elif not self.model.startswith("openai/"):
+                # Normal OpenAI flow
+                self.full_model_name = f"openai/{self.model}"
+            else:
+                self.full_model_name = self.model
         else:
             self.full_model_name = self.model
 

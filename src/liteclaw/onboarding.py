@@ -28,26 +28,23 @@ PROVIDERS = {
             "o1-preview",
             "o1-mini"
         ],
-        "model_prefix": "openai/"  # For LiteLLM: openai/gpt-4o
+        "model_prefix": ""  # Agent adds openai/ prefix if missing
     },
     "OpenRouter": {
-        "provider": "openai",  # OpenRouter is OpenAI-compatible
+        "provider": "openai",
         "base_url": "https://openrouter.ai/api/v1",
         "api_key_env": "OPENROUTER_API_KEY",
         "description": "Access 200+ models via unified API",
         "models": [
-            # Latest cutting-edge models (2026)
-            "anthropic/claude-opus-4.5",              # $5/$25 - Coding & Agents - 200K
-            "openai/gpt-5.2-pro",                     # $21/$168 - Deep Reasoning - 400K
-            "openai/gpt-5.2",                         # $2/$14 - General Purpose - 400K
-            "google/gemini-3-flash-preview",          # $0.50/$3 - Speed & Reasoning - 1M
-            "anthropic/claude-sonnet-4",              # $3/$15 - Excellence - 200K
-            "deepseek/deepseek-v3.2",                 # $0.25/$0.38 - Value King - 163K
-            "xiaomi/mimo-v2-flash-309b-moe",          # Free - Free Coding - 256K
-            "mistral/devstral-2-2512",                # $0.05/$0.22 - Agentic Coding - 256K
-            "bytedance/seed-1.6-flash",               # $0.07/$0.30 - Fast Multimodal - 256K
-            
-            # Popular stable models
+            "anthropic/claude-opus-4.5",
+            "openai/gpt-5.2-pro",
+            "openai/gpt-5.2",
+            "google/gemini-3-flash-preview",
+            "anthropic/claude-sonnet-4",
+            "deepseek/deepseek-v3.2",
+            "xiaomi/mimo-v2-flash-309b-moe",
+            "mistral/devstral-2-2512",
+            "bytedance/seed-1.6-flash",
             "anthropic/claude-3.5-sonnet",
             "anthropic/claude-3-opus",
             "google/gemini-2.0-flash-exp",
@@ -58,10 +55,10 @@ PROVIDERS = {
             "qwen/qwen-2.5-72b-instruct",
             "deepseek/deepseek-chat"
         ],
-        "model_prefix": "openrouter/"  # For LiteLLM: openrouter/anthropic/claude-3.5-sonnet
+        "model_prefix": ""  # Handled by agent's new OpenAI proxy logic
     },
     "Groq": {
-        "provider": "groq",
+        "provider": "openai",  # Use OpenAI-compatible bridge
         "base_url": "https://api.groq.com/openai/v1",
         "api_key_env": "GROQ_API_KEY",
         "description": "Ultra-fast inference with open models",
@@ -72,33 +69,44 @@ PROVIDERS = {
             "mixtral-8x7b-32768",
             "gemma2-9b-it"
         ],
-        "model_prefix": "groq/"  # For LiteLLM: groq/llama-3.3-70b-versatile
+        "model_prefix": "" 
     },
     "DeepSeek": {
-        "provider": "deepseek",
+        "provider": "openai", # Use OpenAI-compatible bridge
         "base_url": "https://api.deepseek.com/v1",
         "api_key_env": "DEEPSEEK_API_KEY",
         "description": "High-quality Chinese AI models",
         "models": [
             "deepseek-chat",
-            "deepseek-coder"
+            "deepseek-coder",
+            "deepseek-reasoner"
         ],
-        "model_prefix": "deepseek/"  # For LiteLLM: deepseek/deepseek-chat
+        "model_prefix": ""
+    },
+    "Hugging Face": {
+        "provider": "huggingface",
+        "base_url": None, # Uses hub by default
+        "api_key_env": "HUGGINGFACE_API_KEY",
+        "description": "Access open-source models via HF Hub",
+        "models": [
+            "meta-llama/Llama-3.2-3B-Instruct",
+            "mistralai/Mistral-7B-Instruct-v0.3",
+            "google/gemma-2-27b-it"
+        ],
+        "model_prefix": "huggingface/"
     },
     "Ollama (Local)": {
         "provider": "ollama",
         "base_url": "http://localhost:11434",
-        "api_key_env": None,  # No API key needed for local
+        "api_key_env": None,
         "description": "Run models locally on your machine",
         "models": [
             "llama3.2",
             "llama3.1",
             "qwen2.5",
-            "mistral",
-            "gemma2",
             "deepseek-r1"
         ],
-        "model_prefix": "ollama/"  # For LiteLLM: ollama/llama3.2
+        "model_prefix": "ollama/"
     }
 }
 

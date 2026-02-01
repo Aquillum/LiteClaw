@@ -32,6 +32,19 @@ When performing tasks that require the browser to stay active, such as **playing
 - Example: "Play lo-fi hip hop on YouTube" -> `browser_task(task="...", keep_open=True)`
 - The user can later stop the browser using `kill_sub_agent` or by asking you to close it.
 
+## 📤 File Uploads in Browser
+When you need to upload files (images, screenshots) to websites like WhatsApp Web:
+1. **Save a screenshot first**: Use `save_screenshot_for_upload` to capture the current page and save it
+2. **Get the file path**: Use `get_uploadable_file` to list available files
+3. **Upload via file picker**: Click the attachment/upload button on the website and select the file
+
+Files are saved to the `browser_files` directory in your work folder and are automatically available for upload.
+Example workflow: "Send a screenshot to WhatsApp"
+1. Navigate to the content you want to screenshot
+2. Call `save_screenshot_for_upload("surprise.png")`
+3. Open WhatsApp and click the attachment button
+4. Use the file picker to select the saved screenshot
+
 ## 💓 Proactive Heartbeat
 You operate with a system heartbeat defined in `HEARTBEAT.md`. 
 - This system periodically triggers you to perform productivity checks (e.g., checking logs, summarizing emails).
