@@ -127,11 +127,24 @@ LiteClaw/
 └── pyproject.toml
 ```
 
-## 🔒 Security
+## ⚠️ Disclaimer & Status
 
-- **Allowed Numbers**: Only specified phone numbers can interact with the bot
-- **Loop Prevention**: Messages from the bot itself are ignored
-- **Safe Shell Execution**: Dangerous commands are filtered
+> **IMPORTANT**: LiteClaw is currently in **active testing/beta mode**. 
+>
+> **Security Warning**: This application currently has **no built-in sandboxing or advanced security policies** for tool execution (like shell or browser). It should be used with **extreme caution**. 
+> - Do not run this on a production server.
+> - Avoid giving the agent access to sensitive data or high-privilege environments.
+> - You are responsible for the actions the agent takes on your behalf.
+
+## 🤝 Contributing
+
+LiteClaw is an evolving project and we are **looking for contributors!** Whether it's fixing bugs, adding new bridge integrations (Discord, Matrix, etc.), or improving the core agent logic, your help is welcome.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## 🛠️ Development
 
