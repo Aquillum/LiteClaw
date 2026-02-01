@@ -1,0 +1,3 @@
+recursive-include src/liteclaw/bridge *
+exclude src/liteclaw/bridge/node_modules
+exclude src/liteclaw/bridge/.env

@@ -16,6 +16,10 @@ app = FastAPI(title="LiteClaw Backend")
 @app.on_event("startup")
 async def startup_event():
     cron_manager.start()
+    
+    # Start Heartbeat Monitor
+    from .heartbeat import heartbeat
+    heartbeat.start()
 
 class CreateSessionRequest(BaseModel):
     session_id: Optional[str] = None
@@ -108,14 +112,15 @@ async def handle_whatsapp_incoming(request: Request):
     if message.strip().lower() == "/reset":
         from .memory import reset_session
         reset_session(session_id)
-        print(f"[WhatsApp] Session '{session_id}' RESET by user.")
+        print(f"[{platform.title()}] Session '{session_id}' RESET by user.")
         
-        # Send confirmation
+        # Send confirmation via the correct platform
         async with httpx.AsyncClient() as client:
             try:
                 await client.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json={
                     "to": sender,
-                    "message": "[LiteClaw] 🔄 Session reset. Context cleared."
+                    "message": "[LiteClaw] 🔄 Session reset. Context cleared.",
+                    "platform": platform  # Route to correct platform
                 })
             except Exception:
                 pass
@@ -125,17 +130,37 @@ async def handle_whatsapp_incoming(request: Request):
     # Include sender context so the AI knows who it's talking to within the shared session
     context_message = f"[{sender_name} ({sender})]: {message}"
 
-    if from_me:
-        # If the message is from us (LiteClaw or the user on this account), 
-        # we store it in history to keep context, but we NEVER trigger a reply.
-        from .memory import add_message
-        add_message(session_id, {"role": "user", "content": context_message})
-        print(f"[WhatsApp] Stored outgoing message for {sender_name} in session '{session_id}'")
-        # return {"status": "stored_outgoing"}
+    # PRIORITY CHECK #1: Is this a response to a browser question?
+    # This must come BEFORE the from_me check so browser answers work regardless of sender
+    from .browser_utils import get_pending_question, set_human_answer
+    pending_q = get_pending_question(session_id)
+    
+    if pending_q:
+        # User is responding to a browser automation question
+        set_human_answer(session_id, message)
+        
+        # Send confirmation (only if not from self to avoid double messages)
+        if not from_me:
+            async with httpx.AsyncClient() as client:
+                try:
+                    await client.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json={
+                        "to": sender,
+                        "message": f"[LiteClaw] ✅ Got it! Continuing browser task with your answer: \"{message}\"",
+                        "platform": platform
+                    })
+                except:
+                    pass
+        else:
+            print(f"[Browser] ✅ Received answer to pending question: {message}")
+        
+        return {"status": "browser_question_answered"}
 
-    # Loop Prevention: Never respond to ourselves if we are wearing the bot badge
+    # PRIORITY CHECK #2: Loop Prevention for LiteClaw messages
     if "[LiteClaw]" in message:
         return {"status": "ignored_bot_loop"}
+
+    # All other messages continue to agent processing
+    # (Browser answers and loop prevention already handled above)
 
     async def typing_loop():
         """Keep sending typing status while AI is thinking."""
@@ -196,6 +221,11 @@ def create_session_endpoint(request: CreateSessionRequest):
     else:
         # If it exists, we just return it, effectively "joining" it (or could raise error)
         return {"session_id": sid, "status": "exists"}
+
+@app.get("/sessions/list")
+def list_sessions_endpoint():
+    from .memory import list_sessions
+    return list_sessions()
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):

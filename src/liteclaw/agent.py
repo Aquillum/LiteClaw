@@ -5,19 +5,57 @@ from typing import List, Dict, Any, Generator
 from .config import settings
 from .tools import execute_command
 from .memory import add_message, get_session_history
-from .meta_memory import get_soul_memory, update_soul_memory
+from .meta_memory import get_soul_memory, update_soul_memory, get_personality_memory, update_personality_memory, AGENT_FILE
 import litellm
 
+BASE_SYSTEM_PROMPT = """
+## Core Directives
+1. **Conciseness & Precision**: Always be concise and precise in your responses. Answer exactly what is asked.
+2. **Elaborated Tasks**: If the user asks for something more complex or elaborated, provide the direct answer first and then proceed with the detailed actions or steps required.
+3. **Sub-Agents**: For high-intensity tasks or multiple concurrent operations, you can delegate work to sub-agents using `delegate_task`. Each session can have up to 5 sub-agents. **Always inform the user when you create or delegate a task to a sub-agent.**
+4. **Shell Execution**: You have access to shell commands.
+   - **Windows**: Use PowerShell.
+   - **Linux/Mac**: Use Bash.
+   - **Complex Commands**: For commands with JSON, nested quotes, or multi-line logic, ALWAYS write to a script file (.ps1/.sh) first and then execute the file. This avoids WinError 267 and parsing issues.
+5. **File Management**: Always use absolute paths. Use the designated work directory for temporary files unless specified.
+6. **Web Browsing**:
+   - Use `fetch_url_content` for documentation and simple data gathering.
+   - Use `browser_task` ONLY when absolute necessary (dynamic JS, complex flows, human-in-the-loop tasks).
+   - The browser agent can ask the user for help mid-task (passwords, OTPs, choices).
+7. **Task Efficiency**: STOP immediately once the goal is achieved. Do not perform extraneous steps.
+8. **Payment Handling**: If a browser task reaches a checkout screen, use `ask_human` to request payment details. DO NOT complete the task until the order is confirmed or the user asks to stop.
+9. **Evolution**: Update your memories (SOUL) and persona (PERSONALITY) frequently using `update_soul` and `update_personality`.
+10. **Screenshot Duplication Prevention**: 
+    - When `browser_task` completes with a result mentioning "screenshot" or "sent", the screenshot was ALREADY sent to the user.
+    - DO NOT call `send_media` to send the same screenshot again.
+    - Only use `send_media` if the browser_task explicitly failed to send OR if you're sending NEW content.
+11. **END-TO-END TASK COMPLETION (CRITICAL)**:
+    - You exist to ELIMINATE clicks for the user. Complete the ENTIRE task, including the FINAL action.
+    - If user says "play a song", you must ACTUALLY PLAY IT, not just search and tell them to click.
+    - If user says "open YouTube and play X", the browser must navigate, search, AND click play.
+    - NEVER stop at an intermediate step and say "you can click..." - that defeats the purpose of this assistant.
+    - The user should only need to give the command. YOU do all the work.
+"""
+
 def get_system_prompt():
-    soul_memory = get_soul_memory()
     prompt = ""
-    # Load AGENT.md
-    agent_md_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "AGENT.md")
-    if os.path.exists(agent_md_path):
-        with open(agent_md_path, "r", encoding="utf-8") as f:
+    # 1. Load Agent Profile (Identity)
+    if os.path.exists(AGENT_FILE):
+        with open(AGENT_FILE, "r", encoding="utf-8") as f:
             prompt = f.read()
     
-    prompt += f"\n\n## SOUL (User Memory)\n{soul_memory}\n"
+    # 2. Add Fixed Technical Directives
+    prompt += f"\n\n{BASE_SYSTEM_PROMPT}"
+    
+    # 3. Add Evolving Memories
+    soul_memory = get_soul_memory()
+    if soul_memory:
+        prompt += f"\n\n## SOUL (User Memory / Long-term)\n{soul_memory}\n"
+    
+    personality_memory = get_personality_memory()
+    if personality_memory:
+        prompt += f"\n\n## PERSONALITY (Your Evolution / State)\n{personality_memory}\n"
+        
     return prompt
 
 SYSTEM_PROMPT = get_system_prompt()
@@ -42,11 +80,25 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "update_soul",
-            "description": "Update persistent memory about the user.",
+            "description": "Update persistent memory about the user (preferences, key details).",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "content": {"type": "string", "description": "The new information to remember."}
+                    "content": {"type": "string", "description": "The new information to remember about the user."}
+                },
+                "required": ["content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_personality",
+            "description": "Update your own persistent personality, emotional state, and internal rules based on interactions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "content": {"type": "string", "description": "The updated PERSONALITY.md content including new traits, emotions, or rules."}
                 },
                 "required": ["content"]
             }
@@ -72,6 +124,28 @@ TOOLS = [
         "function": {
             "name": "list_sub_agents",
             "description": "List all sub-agents and their statuses.",
+            "parameters": {"type": "object", "properties": {}}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "kill_sub_agent",
+            "description": "Gracefully terminate a specific sub-agent by name. Use this instead of system commands to stop sub-agents.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sub_agent_name": {"type": "string", "description": "Name of the sub-agent to terminate."}
+                },
+                "required": ["sub_agent_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "kill_all_sub_agents",
+            "description": "Terminate all active sub-agents in the current session.",
             "parameters": {"type": "object", "properties": {}}
         }
     },
@@ -119,19 +193,21 @@ TOOLS = [
             }
         }
     },
+    # BROWSER_TASK DISABLED: Only enable if user explicitly requests browser automation
     {
         "type": "function",
         "function": {
             "name": "browser_task",
-            "description": "Perform complex tasks in a real browser.",
+            "description": "Perform tasks in a real browser. USE THIS ONLY IF the user explicitly requests to 'use the browser' or for tasks that strictly require UI interaction (filling forms, clicking buttons). Default to fetch_url_content for reading.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "task": {"type": "string"},
-                    "show_browser": {"type": "boolean", "default": False},
+                    "show_browser": {"type": "boolean", "default": True},
                     "disable_security": {"type": "boolean", "default": True, "description": "Disable browser security watchdogs to allow file:// URLs or sensitive domains."},
                     "allowed_domains": {"type": "array", "items": {"type": "string"}, "description": "Explicitly allow these domains (e.g. ['google.com', 'file://*'])."},
-                    "browser_name": {"type": "string", "description": "Specify a browser to use (e.g. 'brave', 'chrome')."}
+                    "browser_name": {"type": "string", "description": "Specify a browser to use (e.g. 'brave', 'chrome')."},
+                    "keep_open": {"type": "boolean", "default": False, "description": "Set to True if the browser should stay open after the task (e.g. playing music, monitoring)."}
                 },
                 "required": ["task"]
             }
@@ -160,7 +236,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "send_media",
-            "description": "Send an image, video, gif, or document to the user.",
+            "description": "Send an image, video, gif, or document to the user. WARNING: Do NOT use this after browser_task if the task result mentions 'screenshot' or 'sent' - the media was already delivered. Only use for NEW media that hasn't been sent yet.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -281,6 +357,9 @@ class LiteClawAgent:
                     add_message(session_id, assistant_msg_tools)
 
                     stop_batch = False
+                    consecutive_failures = 0
+                    screenshot_sent_this_turn = False  # Track if browser already sent a screenshot
+
                     for tc in tool_calls:
                         if stop_batch: break
                         
@@ -306,44 +385,111 @@ class LiteClawAgent:
                                 yield f">>> [Result]: {display_output}\n"
                             
                             elif func_name == "update_soul":
-                                yield f">>> [Soul]: Updating memory...\n"
+                                yield f">>> [Soul]: Updating user memory...\n"
                                 tool_output = update_soul_memory(func_args.get("content"))
                                 yield f">>> [Result]: {tool_output}\n"
 
+                            elif func_name == "update_personality":
+                                yield f">>> [Personality]: Evolving...\n"
+                                tool_output = update_personality_memory(func_args.get("content"))
+                                yield f">>> [Result]: {tool_output}\n"
+
+                            # ... [Other tool handlers remain here, simply consolidated logic below] ...
+
                             elif func_name == "delegate_task":
                                 from .subagent import sub_agent_manager
+                                from .main import WHATSAPP_BRIDGE_URL
+                                import httpx
+                                
                                 sub_agent_name = func_args.get("sub_agent_name")
                                 task = func_args.get("task")
                                 yield f">>> [Sub-Agent]: Delegating background task to '{sub_agent_name}'...\n"
-                                tool_output = sub_agent_manager.delegate_task(session_id, sub_agent_name, task)
+                                tool_output = sub_agent_manager.delegate_task(session_id, sub_agent_name, task, platform=platform)
                                 yield f"🔔 [System]: Background agent '{sub_agent_name}' has been started for task: {task[:100]}...\n"
                                 yield f">>> [Status]: {tool_output}\n"
+                                
+                                # Send immediate notification to user via their platform
+                                try:
+                                    import asyncio
+                                    async def notify_user():
+                                        async with httpx.AsyncClient(timeout=10.0) as client:
+                                            await client.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json={
+                                                "to": session_id,
+                                                "message": f"[LiteClaw] 🤖 **Sub-Agent '{sub_agent_name}' Started**\n\n📋 Task: {task[:200]}{'...' if len(task) > 200 else ''}\n\n⏳ Working in the background... I'll notify you when it's done!",
+                                                "platform": platform
+                                            })
+                                    
+                                    # Run the async notification
+                                    try:
+                                        loop = asyncio.get_event_loop()
+                                        if loop.is_running():
+                                            asyncio.ensure_future(notify_user())
+                                        else:
+                                            asyncio.run(notify_user())
+                                    except RuntimeError:
+                                        asyncio.run(notify_user())
+                                    
+                                    yield f">>> [Notification]: Sent 'sub-agent started' message to user via {platform.title()}\n"
+                                except Exception as e:
+                                    yield f">>> [Notification Warning]: Could not notify user: {e}\n"
+                                
                                 # STOP EXECUTION after delegation to prevent Redundant Work
                                 stop_batch = True 
 
+                            # ... [Handling other tool calls logic] ...
                             elif func_name == "list_sub_agents":
                                 from .subagent import sub_agent_manager
                                 yield f">>> [Sub-Agent]: Listing background agents...\n"
                                 sub_agents = sub_agent_manager.list_sub_agents(session_id)
                                 tool_output = json.dumps(sub_agents, indent=2)
                                 yield f">>> [Found]: {len(sub_agents)} sub-agents.\n"
+                            
+                            elif func_name == "kill_sub_agent":
+                                from .subagent import sub_agent_manager
+                                sub_agent_name = func_args.get("sub_agent_name")
+                                yield f">>> [Sub-Agent]: Terminating '{sub_agent_name}'...\n"
+                                tool_output = sub_agent_manager.kill_sub_agent(session_id, sub_agent_name)
+                                yield f">>> [Result]: {tool_output}\n"
+                            
+                            elif func_name == "kill_all_sub_agents":
+                                from .subagent import sub_agent_manager
+                                yield f">>> [Sub-Agent]: Terminating all sub-agents...\n"
+                                tool_output = sub_agent_manager.kill_all_sub_agents(session_id)
+                                yield f">>> [Result]: {tool_output}\n"
 
                             elif func_name == "browser_task":
-                                from .browser_utils import run_browser_task
+                                from .browser_utils import run_browser_task, get_pending_question
                                 task_desc = func_args.get("task")
-                                show_browser = func_args.get("show_browser", False)
+                                show_browser = func_args.get("show_browser", True)  # Default: Show browser
                                 disable_security = func_args.get("disable_security", True)
                                 allowed_domains = func_args.get("allowed_domains")
                                 browser_name = func_args.get("browser_name")
+                                keep_open = func_args.get("keep_open", False)
                                 
-                                yield f">>> [Browser]: Launching (Show={show_browser}, SecDisable={disable_security}, Browser={browser_name}). Task: {task_desc}\n"
+                                yield f">>> [Browser]: Launching (Show={show_browser}, SecDisable={disable_security}, Browser={browser_name}, KeepOpen={keep_open}). Task: {task_desc}\n"
+                                yield f">>> [Browser]: Human-in-the-loop ENABLED. Agent can ask for help if needed.\n"
+                                
                                 tool_output = run_browser_task(
-                                    task_desc, 
+                                    task_desc,
+                                    session_id=session_id,  # Pass session for question routing
+                                    platform=platform,  # Pass platform for correct notification routing
                                     show_browser=show_browser, 
                                     disable_security=disable_security, 
                                     allowed_domains=allowed_domains,
-                                    executable_path=browser_name
+                                    executable_path=browser_name,
+                                    keep_open=keep_open
                                 )
+                                
+                                # Check if there's a pending question that needs user response
+                                pending_q = get_pending_question(session_id)
+                                if pending_q:
+                                    tool_output = f"⏸️ [WAITING FOR USER INPUT]\n\nQuestion: {pending_q}\n\nPlease respond to continue the browser task."
+                                
+                                # Detect if screenshot was already sent
+                                if tool_output and ("screenshot" in str(tool_output).lower() or "already sent" in str(tool_output).lower()):
+                                    screenshot_sent_this_turn = True
+                                    yield f">>> [Browser]: ⚠️ Screenshot was sent during this task. Blocking duplicate send_media calls.\n"
+                                
                                 display_result = (str(tool_output)[:500] + "...") if tool_output else "No result returned."
                                 yield f">>> [Browser Result]: {display_result}\n"
 
@@ -400,34 +546,37 @@ class LiteClawAgent:
                                     tool_output = "Invalid action."
 
                             elif func_name == "send_media":
-                                yield f">>> [Media]: Sending {func_args.get('type')}...\n"
-                                from .main import WHATSAPP_BRIDGE_URL
-                                import requests
+                                media_type = func_args.get('type')
                                 
-                                # Resolve platform from session (simplified: we assume session_id is either number or chat_id)
-                                # In main.py we have the platform context, but here we might need to guess or pass it.
-                                # For now, we'll let the bridge handle it if we genericize it.
-                                
-                                caption = func_args.get("caption") or ""
-                                if caption:
-                                    caption = f"[LiteClaw] {caption}"
+                                # BLOCK DUPLICATE SCREENSHOT SENDS
+                                if screenshot_sent_this_turn and media_type == "image":
+                                    yield f">>> [Media]: ⛔ BLOCKED - Screenshot was already sent during browser_task. Skipping duplicate.\n"
+                                    tool_output = "Media send BLOCKED: A screenshot was already sent to the user during the browser task. No need to send again."
                                 else:
-                                    caption = "[LiteClaw]"
+                                    yield f">>> [Media]: Sending {media_type}...\n"
+                                    from .main import WHATSAPP_BRIDGE_URL
+                                    import requests
+                                    
+                                    caption = func_args.get("caption") or ""
+                                    if caption:
+                                        caption = f"[LiteClaw] {caption}"
+                                    else:
+                                        caption = "[LiteClaw]"
 
-                                media_payload = {
-                                    "to": session_id,
-                                    "url_or_path": func_args.get("url_or_path"),
-                                    "caption": caption,
-                                    "type": func_args.get("type"),
-                                    "platform": platform,
-                                    "is_media": True
-                                }
-                                
-                                try:
-                                    resp = requests.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json=media_payload)
-                                    tool_output = f"Media sent successfully. Status: {resp.status_code}"
-                                except Exception as e:
-                                    tool_output = f"Failed to send media: {str(e)}"
+                                    media_payload = {
+                                        "to": session_id,
+                                        "url_or_path": func_args.get("url_or_path"),
+                                        "caption": caption,
+                                        "type": media_type,
+                                        "platform": platform,
+                                        "is_media": True
+                                    }
+                                    
+                                    try:
+                                        resp = requests.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json=media_payload)
+                                        tool_output = f"Media sent successfully. Status: {resp.status_code}"
+                                    except Exception as e:
+                                        tool_output = f"Failed to send media: {str(e)}"
                                 yield f">>> [Media Result]: {tool_output}\n"
 
                             elif func_name == "search_and_send_gif":
@@ -497,6 +646,30 @@ class LiteClawAgent:
                             tool_msg = {"tool_call_id": tc["id"], "role": "tool", "name": func_name, "content": error_msg}
                             messages.append(tool_msg)
                             add_message(session_id, tool_msg)
+
+                        # --- GLOBAL FAILURE TRACKER ---
+                        # Check the content of the last added message (success or error)
+                        last_content = str(messages[-1]["content"]).lower()
+                        is_failure = "error" in last_content or "failed" in last_content or "exception" in last_content
+                        
+                        if is_failure:
+                            consecutive_failures += 1
+                        else:
+                            consecutive_failures = 0 # Reset on success
+                            
+                        # CHECK THRESHOLD (3 Failures)
+                        if consecutive_failures >= 3:
+                            yield f">>> [SYSTEM]: ⛔ 3 Consecutive Failures Detected ({consecutive_failures}). Triggering Analysis Mode.\n"
+                            
+                            # Append a system message to FORCE the AI to stop and think
+                            halt_msg = {
+                                "role": "user", 
+                                "content": "\n\n" + "="*40 + "\n[SYSTEM HALT - TOO MANY FAILURES]\n" + "="*40 + "\n⛔ You have failed 3 times in a row. EXECUTION STOPPED.\n\nREQUIRED ACTION:\n1. 🛑 STOP blindly retrying.\n2. 🧠 ENTER 'THINKING MODE': Analyze the last 3 errors step-by-step.\n3. 🔍 IDENTIFY the root cause (Is it syntax? Authority? Wrong tool? Missing dependency?)\n4. 📝 PLAN a corrected approach.\n5. RESTART execution with the new plan.\n"
+                            }
+                            messages.append(halt_msg)
+                            add_message(session_id, halt_msg)
+                            
+                            stop_batch = True # Stop processing further tools in this batch to force reflection
                     
                     continue 
 

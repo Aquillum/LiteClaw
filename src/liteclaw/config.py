@@ -2,8 +2,20 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 from typing import Optional, Type, Tuple, Dict, Any
 import json
 import os
+import platform
+
+def get_default_work_dir() -> str:
+    """Get default work directory based on OS."""
+    system = platform.system()
+    if system == "Windows":
+        return r"C:\liteclaw"
+    else:
+        return os.path.expanduser("~/liteclaw")
 
 class Settings(BaseSettings):
+    # Work Directory - where LiteClaw stores files, screenshots, configs
+    WORK_DIR: str = get_default_work_dir()
+    
     LLM_PROVIDER: str = "openai"
     LLM_API_KEY: str
     LLM_MODEL: str = "gpt-4o"
@@ -16,9 +28,49 @@ class Settings(BaseSettings):
     GIPHY_API_KEY: Optional[str] = None
     SLACK_BOT_TOKEN: Optional[str] = None
     WHATSAPP_SESSION_ID: str = "whatsapp" # Dedicated session for WhatsApp interactions
+    
+    # Chrome Path
     CHROME_PATH: str = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-    CHROME_USER_DATA_DIR: str = os.path.abspath("./whatsapp_session")
+    
+    @property
+    def CHROME_USER_DATA_DIR(self) -> str:
+        """Store browser sessions in the centralized work directory."""
+        return os.path.join(self.WORK_DIR, "sessions", "browser")
+    
     CHROME_DEBUG_PORT: int = 9222
+    
+    def get_screenshots_dir(self) -> str:
+        """Get the screenshots directory path."""
+        return os.path.join(self.WORK_DIR, "screenshots")
+    
+    def get_configs_dir(self) -> str:
+        """Get the configs directory path."""
+        return os.path.join(self.WORK_DIR, "configs")
+    
+    def get_notes_dir(self) -> str:
+        """Get the notes directory path."""
+        return os.path.join(self.WORK_DIR, "notes")
+    
+    def get_exports_dir(self) -> str:
+        """Get the exports directory path."""
+        return os.path.join(self.WORK_DIR, "exports")
+    
+    def get_agent_instructions_path(self) -> str:
+        """Get the path to AGENT.md in the configs directory."""
+        return os.path.join(self.get_configs_dir(), "AGENT.md")
+    
+    def ensure_work_dirs(self) -> None:
+        """Create work directory and subdirectories if they don't exist."""
+        dirs = [
+            self.WORK_DIR,
+            self.get_screenshots_dir(),
+            self.get_configs_dir(), 
+            self.get_notes_dir(),
+            self.get_exports_dir(),
+            os.path.join(self.WORK_DIR, "sessions")
+        ]
+        for d in dirs:
+            os.makedirs(d, exist_ok=True)
 
     @classmethod
     def settings_customise_sources(
@@ -43,6 +95,7 @@ class Settings(BaseSettings):
 class JsonConfigSettingsSource(PydanticBaseSettingsSource):
     """
     A settings source that reads from a JSON file.
+    Checks local directory first, then default WORK_DIR.
     """
     def get_field_value(
         self, field: Any, field_name: str
@@ -53,12 +106,25 @@ class JsonConfigSettingsSource(PydanticBaseSettingsSource):
 
     def _read_file(self) -> Dict[str, Any]:
         config_file = "config.json"
+        
+        # 1. Try Local Directory
         if os.path.exists(config_file):
             try:
                 with open(config_file) as f:
                     return json.load(f)
             except Exception:
-                return {}
+                pass
+        
+        # 2. Try Default WORK_DIR
+        default_work_dir = get_default_work_dir()
+        work_dir_config = os.path.join(default_work_dir, config_file)
+        if os.path.exists(work_dir_config):
+            try:
+                with open(work_dir_config) as f:
+                    return json.load(f)
+            except Exception:
+                pass
+                
         return {}
 
     def __call__(self) -> Dict[str, Any]:
@@ -69,3 +135,4 @@ class JsonConfigSettingsSource(PydanticBaseSettingsSource):
         return data
 
 settings = Settings()
+settings.ensure_work_dirs()

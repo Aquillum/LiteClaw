@@ -1,11 +1,16 @@
-import sqlite3
+from .config import settings
 import os
-from typing import List, Dict, Any
+import sqlite3
 
-DB_FILE = "liteclaw_memory.db"
+def get_db_file():
+    """Get the absolute path to the database file in WORK_DIR."""
+    return os.path.join(settings.WORK_DIR, "liteclaw_memory.db")
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+    db_file = get_db_file()
+    # Create parent directory if missing (safety)
+    os.makedirs(os.path.dirname(db_file), exist_ok=True)
+    conn = sqlite3.connect(db_file, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 

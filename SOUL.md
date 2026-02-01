@@ -1,1 +1,0 @@
-User email for services: srisanth@hipocap.com. Note: Avoid storing raw passwords in long-term memory for security, but use for immediate tasks.

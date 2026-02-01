@@ -15,6 +15,20 @@ def create_session(session_id: str, parent_session_id: Optional[str] = None):
     finally:
         conn.close()
 
+def list_sessions():
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        # Get all sessions with their last message time if possible, or just IDs
+        # For simplicity, just listing IDs for now.
+        c.execute("SELECT session_id, created_at FROM sessions ORDER BY created_at DESC")
+        rows = c.fetchall()
+        return [{"session_id": row["session_id"], "created_at": row["created_at"]} for row in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
 def add_message(session_id: str, message: dict):
     """
     Store a message in the database.

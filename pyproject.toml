@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "liteclaw"
+version = "0.1.1"
+description = "Lightweight AI Agent Bridge with Adaptive Personality"
+authors = [
+    { name = "Hipocap Team", email = "srisanth@hipocap.com" }
+]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic-settings",
+    "openai",
+    "python-dotenv",
+    "litellm",
+    "json_repair",
+    "rich",
+    "questionary",
+    "selenium",
+    "httpx",
+    "click"
+]
+
+[project.scripts]
+liteclaw = "liteclaw.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/liteclaw"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/liteclaw",
+    "src/liteclaw/bridge",
+    "README.md",
+]

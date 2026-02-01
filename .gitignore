@@ -20,6 +20,8 @@ whatsapp_bridge/.npm
 whatsapp_bridge/.wwebjs_auth/
 whatsapp_bridge/.wwebjs_cache/
 whatsapp_session/
+src/liteclaw/bridge/node_modules/
+
 
 # IDEs
 .vscode/
