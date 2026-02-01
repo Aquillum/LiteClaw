@@ -275,14 +275,25 @@ def setup_bridges(current_config=None):
         if token: config["TELEGRAM_BOT_TOKEN"] = token
 
     if "Slack (requires Bot Token)" in bridges:
+        console.print("\n[yellow]💡 Slack Setup Guide:[/yellow]")
+        console.print("1. Create an App at https://api.slack.com/apps")
+        console.print("2. Add 'Socket Mode' and generate an App-Level Token (xapp-...)")
+        console.print("3. In 'OAuth & Permissions', add scopes: app_mentions:read, chat:write, im:write, im:history, channels:history, users:read")
+        console.print("4. Install to workspace to get Bot User OAuth Token (xoxb-...)")
+        console.print("5. Get Signing Secret from 'Basic Information'\n")
+
         bot_token = questionary.text("Enter Slack Bot Token (xoxb-...):", 
                                    default=current_config.get("SLACK_BOT_TOKEN", "") if current_config else "").ask()
         if bot_token: 
-            config["SLACK_BOT_TOKEN"] = bot_token
+            config["SLACK_BOT_TOKEN"] = bot_token.strip()
+            
             app_token = questionary.password("Enter Slack App Token (xapp-...):", 
                                        default=current_config.get("SLACK_APP_TOKEN", "") if current_config else "").ask()
-            if app_token: config["SLACK_APP_TOKEN"] = app_token
+            if app_token: config["SLACK_APP_TOKEN"] = app_token.strip()
+            
             signing_secret = questionary.password("Enter Slack Signing Secret:", 
+                                            default=current_config.get("SLACK_SIGNING_SECRET", "") if current_config else "").ask()
+            if signing_secret: config["SLACK_SIGNING_SECRET"] = signing_secret.strip() 
                                             default=current_config.get("SLACK_SIGNING_SECRET", "") if current_config else "").ask()
             if signing_secret: config["SLACK_SIGNING_SECRET"] = signing_secret
         
