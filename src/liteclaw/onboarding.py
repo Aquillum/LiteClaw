@@ -304,9 +304,7 @@ def setup_bridges(current_config=None):
             
             signing_secret = questionary.password("Enter Slack Signing Secret:", 
                                             default=current_config.get("SLACK_SIGNING_SECRET", "") if current_config else "").ask()
-            if signing_secret: config["SLACK_SIGNING_SECRET"] = signing_secret.strip() 
-                                            default=current_config.get("SLACK_SIGNING_SECRET", "") if current_config else "").ask()
-            if signing_secret: config["SLACK_SIGNING_SECRET"] = signing_secret
+            if signing_secret: config["SLACK_SIGNING_SECRET"] = signing_secret.strip()
         
     return config
 

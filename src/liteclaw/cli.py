@@ -91,7 +91,10 @@ def run(port, host, no_bridge):
             else:
                 # 3. Check for dependencies
                 node_modules = os.path.join(bridge_dir, "node_modules")
-                if not os.path.isdir(node_modules):
+                slack_bolt = os.path.join(node_modules, "@slack", "bolt")
+                
+                # Install if node_modules missing OR @slack/bolt missing (new dependency)
+                if not os.path.isdir(node_modules) or not os.path.exists(slack_bolt):
                     console.print("[yellow]  > First run detected. Installing Node dependencies...[/yellow]")
                     try:
                         subprocess.check_call(["npm", "install"], cwd=bridge_dir, shell=(os.name == 'nt'))
