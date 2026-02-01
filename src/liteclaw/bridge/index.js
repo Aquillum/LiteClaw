@@ -17,6 +17,8 @@ const path = require('path');
 let WORK_DIR = process.env.WORK_DIR;
 let TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 let SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
+let SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN;
+let SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
 
 // Try to load additional config from config.json (checks root and WORK_DIR)
 function loadConfigs() {
@@ -42,6 +44,8 @@ function loadConfigs() {
                 if (!WORK_DIR) WORK_DIR = config.WORK_DIR;
                 if (!TELEGRAM_TOKEN) TELEGRAM_TOKEN = config.TELEGRAM_BOT_TOKEN;
                 if (!SLACK_BOT_TOKEN) SLACK_BOT_TOKEN = config.SLACK_BOT_TOKEN;
+                if (!SLACK_APP_TOKEN) SLACK_APP_TOKEN = config.SLACK_APP_TOKEN;
+                if (!SLACK_SIGNING_SECRET) SLACK_SIGNING_SECRET = config.SLACK_SIGNING_SECRET;
                 console.log(`[Bridge] Loaded config from: ${configPath}`);
                 break;
             }
@@ -264,7 +268,6 @@ app.post('/whatsapp/send', async (req, res) => {
             }
             return res.json({ success: true, platform: 'telegram' });
         }
-
         if (platform === 'slack') {
             if (!SLACK_BOT_TOKEN) throw new Error("SLACK_BOT_TOKEN not initialized");
 
@@ -273,15 +276,25 @@ app.post('/whatsapp/send', async (req, res) => {
                 text = `${caption || ''}\n${url_or_path}`;
             }
 
-            const response = await axios.post('https://slack.com/api/chat.postMessage', {
-                channel: to,
-                text: text
-            }, {
-                headers: { 'Authorization': `Bearer ${SLACK_BOT_TOKEN}` }
-            });
+            // Use Bolt app client if available, fallback to axios
+            if (global.slackApp) {
+                const result = await global.slackApp.client.chat.postMessage({
+                    channel: to,
+                    text: text
+                });
+                if (!result.ok) throw new Error(result.error);
+                return res.json({ success: true, platform: 'slack' });
+            } else {
+                const response = await axios.post('https://slack.com/api/chat.postMessage', {
+                    channel: to,
+                    text: text
+                }, {
+                    headers: { 'Authorization': `Bearer ${SLACK_BOT_TOKEN}` }
+                });
 
-            if (!response.data.ok) throw new Error(response.data.error);
-            return res.json({ success: true, platform: 'slack' });
+                if (!response.data.ok) throw new Error(response.data.error);
+                return res.json({ success: true, platform: 'slack' });
+            }
         }
 
         // --- WhatsApp Logic ---
@@ -395,39 +408,93 @@ if (TELEGRAM_TOKEN) {
     console.log("No TELEGRAM_BOT_TOKEN found in env. Skipping Telegram.");
 }
 
-// --- Slack Webhook (Events API) ---
-app.post('/slack/events', async (req, res) => {
-    const body = req.body;
+// --- Slack Socket Mode (Bolt.js) ---
+if (SLACK_BOT_TOKEN && SLACK_APP_TOKEN) {
+    const { App } = require('@slack/bolt');
 
-    // Handle URL verification challenge
-    if (body.type === 'url_verification') {
-        return res.json({ challenge: body.challenge });
-    }
+    console.log("Starting Slack App (Socket Mode)...");
+    const slackApp = new App({
+        token: SLACK_BOT_TOKEN,
+        appToken: SLACK_APP_TOKEN,
+        signingSecret: SLACK_SIGNING_SECRET,
+        socketMode: true,
+    });
 
-    // Handle message events
-    if (body.event && body.event.type === 'message' && !body.event.bot_id) {
+    // Helper function to forward messages to Python backend
+    async function forwardToLiteClaw(channel, text, user, ts, eventType) {
+        // Clean the message text - remove the bot mention if present
+        let cleanText = text.replace(/<@[A-Z0-9]+>/g, '').trim();
+
+        if (!cleanText) {
+            console.log(`[Slack] Empty message after cleaning, skipping.`);
+            return;
+        }
+
         const payload = {
             platform: 'slack',
-            message_id: body.event.ts,
-            from: body.event.channel, // Channel ID as session key (or user if DM)
-            body: body.event.text,
-            timestamp: parseFloat(body.event.ts),
-            senderName: body.event.user, // Usually a User ID, would need lookup for real name
+            message_id: ts,
+            from: channel, // Channel ID as session key
+            body: cleanText,
+            timestamp: parseFloat(ts),
+            senderName: user || "Slack User",
             fromMe: false
         };
 
-        console.log(`[Slack] Payload:`, payload);
+        console.log(`[Slack] [${eventType}] From ${user} in ${channel}: ${cleanText}`);
 
-        // Forward to Python
-        try {
-            await axios.post(PYTHON_BACKEND_URL, payload);
-        } catch (error) {
-            console.error('[Slack] Forward Error:', error.message);
-        }
+        // Acknowledge to Slack immediately (Async)
+        axios.post(PYTHON_BACKEND_URL, payload).then(() => {
+            console.log(`[Slack] Response sent to LiteClaw Backend successfully.`);
+        }).catch(error => {
+            console.error('[Slack] Backend Forward Error:', error.message);
+        });
     }
 
-    res.sendStatus(200);
-});
+    // Capture everything for debugging
+    slackApp.message(async ({ message }) => {
+        console.log(`[Slack DEBUG] Generic message event: ${message.text ? message.text.substring(0, 20) : 'No text'}`);
+
+        // Handle DMs (im) and Group DMs (mpim)
+        if (message.channel_type === 'im' || message.channel_type === 'mpim') {
+            if (message.bot_id || message.subtype === 'bot_message') return;
+            await forwardToLiteClaw(message.channel, message.text, message.user, message.ts, 'DM');
+        }
+    });
+
+    // Handle Mentions specifically
+    slackApp.event('app_mention', async ({ event }) => {
+        console.log(`[Slack DEBUG] Mention event caught.`);
+        await forwardToLiteClaw(event.channel, event.text, event.user, event.ts, 'Mention');
+    });
+
+    (async () => {
+        try {
+            console.log(`[Slack] Attempting to connect to Slack Socket Mode...`);
+            console.log(`[Slack] Bot Token: ${SLACK_BOT_TOKEN ? 'Present' : 'MISSING'}`);
+            console.log(`[Slack] App Token: ${SLACK_APP_TOKEN ? 'Present' : 'MISSING'}`);
+            console.log(`[Slack] Signing Secret: ${SLACK_SIGNING_SECRET ? 'Present' : 'MISSING'}`);
+
+            await slackApp.start();
+            console.log("Slack App (Socket Mode) is running!");
+            console.log("  - @mention the bot in channels to interact.");
+            console.log("  - DM the bot directly for private conversations.");
+            global.slackApp = slackApp;
+        } catch (err) {
+            console.error("[Slack] Failed to start Bolt app. Error details:");
+            console.error(err);
+        }
+    })();
+} else {
+    console.log("No SLACK_BOT_TOKEN or SLACK_APP_TOKEN found. Skipping Slack Socket Mode.");
+    // Fallback Events API handler if tokens aren't provided for Socket Mode
+    app.post('/slack/events', async (req, res) => {
+        const body = req.body;
+        if (body.type === 'url_verification') {
+            return res.json({ challenge: body.challenge });
+        }
+        res.sendStatus(200);
+    });
+}
 
 const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Unified Bridge (WhatsApp/Telegram/Slack) running on port ${PORT}`);

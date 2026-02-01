@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: Optional[str] = None
     GIPHY_API_KEY: Optional[str] = None
     SLACK_BOT_TOKEN: Optional[str] = None
+    SLACK_APP_TOKEN: Optional[str] = None
+    SLACK_SIGNING_SECRET: Optional[str] = None
     WHATSAPP_SESSION_ID: str = "whatsapp" # Dedicated session for WhatsApp interactions
     
     # Chrome Path

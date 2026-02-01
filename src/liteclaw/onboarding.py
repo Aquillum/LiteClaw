@@ -275,8 +275,16 @@ def setup_bridges(current_config=None):
         if token: config["TELEGRAM_BOT_TOKEN"] = token
 
     if "Slack (requires Bot Token)" in bridges:
-        token = questionary.text("Enter Slack Token:", default=current_config.get("SLACK_BOT_TOKEN", "") if current_config else "").ask()
-        if token: config["SLACK_BOT_TOKEN"] = token
+        bot_token = questionary.text("Enter Slack Bot Token (xoxb-...):", 
+                                   default=current_config.get("SLACK_BOT_TOKEN", "") if current_config else "").ask()
+        if bot_token: 
+            config["SLACK_BOT_TOKEN"] = bot_token
+            app_token = questionary.password("Enter Slack App Token (xapp-...):", 
+                                       default=current_config.get("SLACK_APP_TOKEN", "") if current_config else "").ask()
+            if app_token: config["SLACK_APP_TOKEN"] = app_token
+            signing_secret = questionary.password("Enter Slack Signing Secret:", 
+                                            default=current_config.get("SLACK_SIGNING_SECRET", "") if current_config else "").ask()
+            if signing_secret: config["SLACK_SIGNING_SECRET"] = signing_secret
         
     return config
 
@@ -310,6 +318,12 @@ def pair_whatsapp(bridge_dir, work_dir, config_data):
 
     if config_data.get("TELEGRAM_BOT_TOKEN"):
         env["TELEGRAM_BOT_TOKEN"] = config_data["TELEGRAM_BOT_TOKEN"]
+    if config_data.get("SLACK_BOT_TOKEN"):
+        env["SLACK_BOT_TOKEN"] = config_data["SLACK_BOT_TOKEN"]
+    if config_data.get("SLACK_APP_TOKEN"):
+        env["SLACK_APP_TOKEN"] = config_data["SLACK_APP_TOKEN"]
+    if config_data.get("SLACK_SIGNING_SECRET"):
+        env["SLACK_SIGNING_SECRET"] = config_data["SLACK_SIGNING_SECRET"]
     
     try:
         process = subprocess.Popen(
