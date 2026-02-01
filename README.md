@@ -1,8 +1,12 @@
 # 🦞 LiteClaw
 
-**Lightweight AI Agent Bridge with Adaptive Personality**
+**Lightweight Light Weight AI Assistant**
 
-LiteClaw is a sophisticated AI agent gateway that connects LLMs to your world through messaging platforms (WhatsApp, Telegram, Slack) and enables powerful capabilities like browser automation, shell execution, and proactive task management.
+LiteClaw is a lite weight AI Assistant gateway that connects LLMs to your world through messaging platforms (WhatsApp, Telegram, Slack) and enables powerful capabilities like browser automation, shell execution, and proactive task management.
+
+<p align="center">
+  <img src="assets/logo.png" width="300" alt="LiteClaw Logo">
+</p>
 
 > **Note**: LiteClaw is a lightweight, Python-based version of [OpenClaw](https://github.com/Pr0fe5s0r/OpenClaw), focusing on speed, modularity, and easy deployment while providing the core agentic capabilities.
 
@@ -138,7 +142,7 @@ LiteClaw/
 
 ## 🤝 Contributing
 
-LiteClaw is an evolving project and we are **looking for contributors!** Whether it's fixing bugs, adding new bridge integrations (Discord, Matrix, etc.), or improving the core agent logic, your help is welcome.
+LiteClaw is an evolving project and we are **looking for contributors and new ideas!** Whether it's fixing bugs, adding new bridge integrations (Discord, Matrix, etc.), improving the core agent logic, or **suggesting creative new use cases**, your input is welcome. We're especially looking for innovative ideas on how to make LiteClaw even more useful in daily life.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
