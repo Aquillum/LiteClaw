@@ -13,6 +13,7 @@ ENV/
 config.json
 liteclaw_memory.db
 *.png
+!assets/*.png
 temp_script.ps1
 
 # Node.js (Bridge)
