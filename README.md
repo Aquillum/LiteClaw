@@ -10,6 +10,15 @@ LiteClaw is a lite weight AI Assistant gateway that connects LLMs to your world 
 
 > **Note**: LiteClaw is a lightweight, Python-based version of [OpenClaw](https://github.com/Pr0fe5s0r/OpenClaw), focusing on speed, modularity, and easy deployment while providing the core agentic capabilities.
 
+## 📸 Demos
+
+Just like its powerful parent project OpenClaw, LiteClaw (the lite mini version) captures user commands and executes them precisely, providing real-time feedback and screenshots.
+
+<p align="center">
+  <img src="assets/printed_demo.png" width="400" alt="Printed Demo">
+  <img src="assets/Screenhot_demo.png" width="400" alt="Screenshot Demo">
+</p>
+
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -142,13 +151,9 @@ LiteClaw/
 
 ## 🤝 Contributing
 
-LiteClaw is an evolving project and we are **looking for contributors and new ideas!** Whether it's fixing bugs, adding new bridge integrations (Discord, Matrix, etc.), improving the core agent logic, or **suggesting creative new use cases**, your input is welcome. We're especially looking for innovative ideas on how to make LiteClaw even more useful in daily life.
+LiteClaw is an evolving project and we are **looking for contributors and new ideas!** Whether it's fixing bugs, adding new bridge integrations (Discord, Matrix, etc.), improving the core agent logic, or **suggesting creative new use cases**, your input is welcome. 
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Please see our **[Contributing Guide](CONTRIBUTING.md)** for more details on how to get involved, join discussions, and submit code.
 
 ## 🛠️ Development
 
