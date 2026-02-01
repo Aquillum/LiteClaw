@@ -12,26 +12,93 @@ from rich.panel import Panel
 console = Console()
 CONFIG_FILE = "config.json"
 
+# LiteLLM Provider Configuration
+# Based on: https://docs.litellm.ai/docs/providers
 PROVIDERS = {
     "OpenAI": {
-        "base": "https://api.openai.com/v1", 
-        "models": ["gpt-4o", "gpt-3.5-turbo", "gpt-4-turbo"]
+        "provider": "openai",  # LiteLLM provider name
+        "base_url": "https://api.openai.com/v1",
+        "api_key_env": "OPENAI_API_KEY",
+        "description": "Official OpenAI API",
+        "models": [
+            "gpt-4o",
+            "gpt-4o-mini", 
+            "gpt-4-turbo",
+            "gpt-3.5-turbo",
+            "o1-preview",
+            "o1-mini"
+        ],
+        "model_prefix": "openai/"  # For LiteLLM: openai/gpt-4o
     },
     "OpenRouter": {
-        "base": "https://openrouter.ai/api/v1",
-        "models": ["anthropic/claude-3.5-sonnet", "google/gemini-pro-1.5", "mistralai/mixtral-8x22b", "openai/gpt-4o"]
+        "provider": "openai",  # OpenRouter is OpenAI-compatible
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key_env": "OPENROUTER_API_KEY",
+        "description": "Access 200+ models via unified API",
+        "models": [
+            # Latest cutting-edge models (2026)
+            "anthropic/claude-opus-4.5",              # $5/$25 - Coding & Agents - 200K
+            "openai/gpt-5.2-pro",                     # $21/$168 - Deep Reasoning - 400K
+            "openai/gpt-5.2",                         # $2/$14 - General Purpose - 400K
+            "google/gemini-3-flash-preview",          # $0.50/$3 - Speed & Reasoning - 1M
+            "anthropic/claude-sonnet-4",              # $3/$15 - Excellence - 200K
+            "deepseek/deepseek-v3.2",                 # $0.25/$0.38 - Value King - 163K
+            "xiaomi/mimo-v2-flash-309b-moe",          # Free - Free Coding - 256K
+            "mistral/devstral-2-2512",                # $0.05/$0.22 - Agentic Coding - 256K
+            "bytedance/seed-1.6-flash",               # $0.07/$0.30 - Fast Multimodal - 256K
+            
+            # Popular stable models
+            "anthropic/claude-3.5-sonnet",
+            "anthropic/claude-3-opus",
+            "google/gemini-2.0-flash-exp",
+            "google/gemini-pro-1.5",
+            "openai/gpt-4o",
+            "meta-llama/llama-3.3-70b-instruct",
+            "mistralai/mixtral-8x22b",
+            "qwen/qwen-2.5-72b-instruct",
+            "deepseek/deepseek-chat"
+        ],
+        "model_prefix": "openrouter/"  # For LiteLLM: openrouter/anthropic/claude-3.5-sonnet
     },
     "Groq": {
-        "base": "https://api.groq.com/openai/v1",
-        "models": ["llama3-70b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"]
+        "provider": "groq",
+        "base_url": "https://api.groq.com/openai/v1",
+        "api_key_env": "GROQ_API_KEY",
+        "description": "Ultra-fast inference with open models",
+        "models": [
+            "llama-3.3-70b-versatile",
+            "llama-3.1-70b-versatile",
+            "llama3-70b-8192",
+            "mixtral-8x7b-32768",
+            "gemma2-9b-it"
+        ],
+        "model_prefix": "groq/"  # For LiteLLM: groq/llama-3.3-70b-versatile
     },
     "DeepSeek": {
-        "base": "https://api.deepseek.com/v1",
-        "models": ["deepseek-chat", "deepseek-coder"]
+        "provider": "deepseek",
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key_env": "DEEPSEEK_API_KEY",
+        "description": "High-quality Chinese AI models",
+        "models": [
+            "deepseek-chat",
+            "deepseek-coder"
+        ],
+        "model_prefix": "deepseek/"  # For LiteLLM: deepseek/deepseek-chat
     },
-    "Custom (Ollama/Local)": {
-        "base": "http://localhost:11434/v1",
-        "models": ["llama3", "mistral", "qwen"]
+    "Ollama (Local)": {
+        "provider": "ollama",
+        "base_url": "http://localhost:11434",
+        "api_key_env": None,  # No API key needed for local
+        "description": "Run models locally on your machine",
+        "models": [
+            "llama3.2",
+            "llama3.1",
+            "qwen2.5",
+            "mistral",
+            "gemma2",
+            "deepseek-r1"
+        ],
+        "model_prefix": "ollama/"  # For LiteLLM: ollama/llama3.2
     }
 }
 
@@ -75,41 +142,104 @@ def setup_work_dir(current_config=None):
 
 def setup_llm(current_config=None):
     console.print("\n[bold]1. LLM Provider Setup[/bold]")
+    console.print("[dim]💡 Tip: OpenRouter gives access to 200+ models with a single API key[/dim]\n")
     
-    default_provider = "OpenRouter"
+    # Build provider selection choices with descriptions
+    provider_choices = [
+        f"{name} - {config['description']}" 
+        for name, config in PROVIDERS.items()
+    ]
+    
+    # Determine default
+    default_choice = provider_choices[1]  # Default to OpenRouter
     if current_config and current_config.get("LLM_BASE_URL"):
-        # Reverse lookup or just use default
-        pass
-
-    provider_name = questionary.select("Select LLM Provider:", choices=list(PROVIDERS.keys()), default=default_provider).ask()
-    if not provider_name: return None
-
-    base_url = PROVIDERS[provider_name]["base"]
-    if provider_name == "Custom (Ollama/Local)":
-        base_url = questionary.text("Enter Base URL:", default=current_config.get("LLM_BASE_URL", base_url)).ask()
-        if base_url is None: return None
-
-    mode_choices = PROVIDERS[provider_name].get("models", []) + ["Input Custom Model Name"]
-    default_model = current_config.get("LLM_MODEL") if current_config else None
+        for name, config in PROVIDERS.items():
+            if config["base_url"] in current_config.get("LLM_BASE_URL", ""):
+                default_choice = f"{name} - {config['description']}"
+                break
     
-    model = questionary.select("Select Model:", choices=mode_choices, default=default_model if default_model in mode_choices else None).ask()
+    selected = questionary.select(
+        "Select LLM Provider:",
+        choices=provider_choices,
+        default=default_choice
+    ).ask()
+    if not selected: return None
+    
+    # Extract provider name from selection (e.g., "Groq - Ultra-fast inference" -> "Groq")
+    provider_name = selected.split(" - ")[0].strip()
+    provider_config = PROVIDERS[provider_name]
+    
+    console.print(f"[dim]Debug: Selected provider '{provider_name}'[/dim]")
+    
+    # Get API key (if needed)
+    api_key = ""
+    if provider_config["api_key_env"]:
+        existing_key = current_config.get("LLM_API_KEY", "") if current_config else ""
+        api_key = questionary.password(
+            f"Enter API Key for {provider_name}:",
+            default=existing_key
+        ).ask()
+        if api_key is None: return None
+        api_key = api_key.strip()
+    else:
+        console.print("[yellow]ℹ️ Local Ollama doesn't require an API key[/yellow]")
+        api_key = "not-needed"
+    
+    # Handle custom base URL for Ollama
+    base_url = provider_config["base_url"]
+    if provider_name == "Ollama (Local)":
+        custom_url = questionary.confirm(
+            "Using default Ollama URL (http://localhost:11434)?",
+            default=True
+        ).ask()
+        if not custom_url:
+            base_url = questionary.text(
+                "Enter Ollama URL:",
+                default=base_url
+            ).ask()
+            if not base_url: base_url = provider_config["base_url"]
+    
+    # Model selection with better UX
+    model_choices = provider_config["models"] + ["Enter custom model name"]
+    default_model = current_config.get("LLM_MODEL", "").replace(provider_config["model_prefix"], "") if current_config else None
+    
+    console.print(f"\n[bold]Select Model for {provider_name}:[/bold]")
+    console.print(f"[dim]Available {len(provider_config['models'])} models[/dim]")
+    
+    model = questionary.select(
+        "Choose a model:",
+        choices=model_choices,
+        default=default_model if default_model in model_choices else None
+    ).ask()
     if model is None: return None
-    if model == "Input Custom Model Name":
-        model = questionary.text("Enter Model Name:", default=default_model or "").ask()
+    
+    if model == "Enter custom model name":
+        console.print(f"\n[yellow]💡 For {provider_name}, use format: {provider_config['model_prefix']}model-name[/yellow]")
+        if provider_name == "OpenRouter":
+            console.print("[dim]Examples: openrouter/anthropic/claude-3.5-sonnet, openrouter/google/gemini-pro[/dim]")
+        
+        model = questionary.text(
+            "Enter full model name:",
+            default=default_model or f"{provider_config['model_prefix']}"
+        ).ask()
         if model is None: return None
-
-    api_key = "sk-placeholder"
-    if provider_name != "Custom (Ollama/Local)":
-        api_key_input = questionary.password(f"Enter API Key for {provider_name}:", default=current_config.get("LLM_API_KEY", "") if current_config else "").ask()
-        if api_key_input is None: return None
-        api_key = api_key_input.strip()
-
+    else:
+        # Add prefix if not already present
+        if not model.startswith(provider_config["model_prefix"]):
+            model = f"{provider_config['model_prefix']}{model}"
+    
+    console.print(f"\n[green]✅ LLM Configuration:[/green]")
+    console.print(f"  Provider: {provider_name}")
+    console.print(f"  Model: {model}")
+    console.print(f"  Base URL: {base_url}")
+    
     return {
-        "LLM_PROVIDER": provider_name,
+        "LLM_PROVIDER": provider_config["provider"],  # Use LiteLLM provider name
         "LLM_BASE_URL": base_url,
         "LLM_API_KEY": api_key,
         "LLM_MODEL": model
     }
+
 
 def setup_bridges(current_config=None):
     console.print("\n[bold]2. Messaging Bridges[/bold]")
@@ -190,6 +320,7 @@ def pair_whatsapp(bridge_dir, work_dir, config_data):
         
         authenticated = False
         discovered_ids = []
+        pin_code = None  # Initialize PIN code variable
         
         while True:
             line = process.stdout.readline()
@@ -208,29 +339,96 @@ def pair_whatsapp(bridge_dir, work_dir, config_data):
                 authenticated = True
                 console.print("\n[bold green]✅ WhatsApp Paired Successfully![/bold green]")
                 
-                # Discovery Mode
+                # Generate unique PIN for ID discovery (only once)
+                import random
+                pin_code = f"{random.randint(100000, 999999)}"
+                
+                # Discovery Mode with PIN
                 console.print("\n[bold yellow]🔍 ID Discovery Mode[/bold yellow]")
-                console.print("Please SEND A MESSAGE from your WhatsApp to LiteClaw now.")
-                console.print("This will let me capture your 'Real ID' automatically so you don't have to type it.")
-                console.print("[dim]Waiting for incoming message... (Press Ctrl+C to skip)[/dim]\n")
+                console.print(f"[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                console.print(f"[bold white]Your Verification PIN: [bold green]{pin_code}[/bold green][/bold white]")
+                console.print(f"[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                console.print("\n[yellow]📱 Steps to capture your WhatsApp ID:[/yellow]")
+                console.print(f"  1. Open WhatsApp on your phone")
+                console.print(f"  2. Send this PIN to LiteClaw: [bold green]{pin_code}[/bold green]")
+                console.print(f"  3. Your ID will be automatically captured!\n")
+                console.print("[dim]⏳ Waiting for PIN verification... (Press Ctrl+C to skip)[/dim]\n")
                 # Don't break, continue loop to catch messages
                 
-            if "[Incoming] From" in line:
+            # Check for incoming messages from others
+            if "[Incoming] From" in line and pin_code:  # Only check if PIN was generated
+                console.print(f"[dim]DEBUG: Found incoming message, PIN is: {pin_code}[/dim]")
                 # Format: [Incoming] From Name (ID): Body
                 import re
-                match = re.search(r"\(([^)]+)\):", line)
+                match = re.search(r"\(([^)]+)\):\s*(.+)", line)
                 if match:
                     found_id = match.group(1)
-                    if found_id not in discovered_ids:
-                        discovered_ids.append(found_id)
-                        console.print(f"\n[bold green]🎯 ID Captured: {found_id}[/bold green]")
-                        if questionary.confirm(f"Add '{found_id}' to authorized numbers?", default=True).ask():
-                            console.print(f"[dim]Added {found_id} to list.[/dim]")
-                        else:
-                            discovered_ids.remove(found_id)
-                        
-                        if not questionary.confirm("Capture another ID?", default=False).ask():
-                            break
+                    message_body = match.group(2).strip()
+                    console.print(f"[dim]DEBUG: Extracted ID={found_id}, Body='{message_body}'[/dim]")
+                    
+                    # Check if message contains the PIN
+                    if pin_code in message_body:
+                        if found_id not in discovered_ids:
+                            discovered_ids.append(found_id)
+                            console.print(f"\n[bold green]✅ PIN VERIFIED![/bold green]")
+                            console.print(f"[bold green]🎯 ID Captured: {found_id}[/bold green]")
+                            
+                            if questionary.confirm(f"Add '{found_id}' to authorized numbers?", default=True).ask():
+                                console.print(f"[green]✓ Added {found_id} to authorized list.[/green]")
+                            else:
+                                discovered_ids.remove(found_id)
+                                console.print(f"[yellow]○ Skipped {found_id}[/yellow]")
+                            
+                            if not questionary.confirm("Capture another ID? (New PIN will be generated)", default=False).ask():
+                                break
+                            else:
+                                # Generate new PIN for next capture
+                                pin_code = f"{random.randint(100000, 999999)}"
+                                console.print(f"\n[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                                console.print(f"[bold white]New Verification PIN: [bold green]{pin_code}[/bold green][/bold white]")
+                                console.print(f"[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                                console.print(f"\n[yellow]Send this PIN from another device: [bold green]{pin_code}[/bold green][/yellow]\n")
+                    else:
+                        console.print(f"[red]❌ Wrong PIN received from {found_id}: '{message_body}'[/red]")
+                        console.print(f"[yellow]💡 Expected PIN: {pin_code}[/yellow]\n")
+                else:
+                    console.print(f"[dim]DEBUG: Regex didn't match for line: {line}[/dim]")
+            
+            # Check for self-sent messages (to capture your own ID)
+            if "[Self] Sent to" in line and pin_code:
+                console.print(f"[dim]DEBUG: Found self-sent message, PIN is: {pin_code}[/dim]")
+                # Format: [Self] Sent to ID: Body
+                import re
+                match = re.search(r"Sent to ([^:]+):\s*(.+)", line)
+                if match:
+                    recipient_id = match.group(1).strip()
+                    message_body = match.group(2).strip()
+                    console.print(f"[dim]DEBUG: Self-sent to ID={recipient_id}, Body='{message_body}'[/dim]")
+                    
+                    # Check if message contains the PIN (user sending PIN to themselves)
+                    if pin_code in message_body:
+                        if recipient_id not in discovered_ids:
+                            discovered_ids.append(recipient_id)
+                            console.print(f"\n[bold green]✅ PIN VERIFIED (Self-Capture)![/bold green]")
+                            console.print(f"[bold green]🎯 ID Captured: {recipient_id}[/bold green]")
+                            
+                            if questionary.confirm(f"Add '{recipient_id}' to authorized numbers?", default=True).ask():
+                                console.print(f"[green]✓ Added {recipient_id} to authorized list.[/green]")
+                            else:
+                                discovered_ids.remove(recipient_id)
+                                console.print(f"[yellow]○ Skipped {recipient_id}[/yellow]")
+                            
+                            if not questionary.confirm("Capture another ID? (New PIN will be generated)", default=False).ask():
+                                break
+                            else:
+                                # Generate new PIN for next capture
+                                pin_code = f"{random.randint(100000, 999999)}"
+                                console.print(f"\n[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                                console.print(f"[bold white]New Verification PIN: [bold green]{pin_code}[/bold green][/bold white]")
+                                console.print(f"[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                                console.print(f"\n[yellow]Send this PIN from another device: [bold green]{pin_code}[/bold green][/yellow]\n")
+                else:
+                    console.print(f"[dim]DEBUG: Self-sent regex didn't match for line: {line}[/dim]")
 
             if process.poll() is not None: break
                 
