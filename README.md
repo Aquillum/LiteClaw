@@ -26,7 +26,7 @@ Just like its powerful parent project OpenClaw, LiteClaw (the lite mini version)
 ## ✨ Features
 
 - 🤖 **Multi-LLM Support**: Works with OpenAI, OpenRouter, Groq, DeepSeek, and local models (Ollama)
-- 📱 **WhatsApp Integration**: Chat with your AI agent via WhatsApp (QR code pairing)
+- 📡 **Multi-Channel Support**: [WhatsApp, Telegram, Slack](CHANNELS.md)
 - 🌐 **Browser Automation**: Powered by `browser-use` for web tasks
 - 💓 **Proactive Heartbeat**: Define periodic autonomous tasks in `HEARTBEAT.md`
 - 🧠 **Adaptive Personality**: Soul/Personality memory that evolves over time
