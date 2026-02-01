@@ -403,7 +403,7 @@ async def _run_browser_task(task_description: str, session_id: str, platform: st
         print(f"[Browser] ✅ Task completed. Result length: {len(str(final_result)) if final_result else 0}")
         
         # Append clear message about screenshots to prevent duplication
-        if final_result and (\"screenshot\" in str(final_result).lower() or \"sent\" in str(final_result).lower()):
+        if final_result and ("screenshot" in str(final_result).lower() or "sent" in str(final_result).lower()):
             final_result = f"{final_result}\n\n[IMPORTANT: Any screenshots taken during this task were ALREADY SENT to the user. Do NOT call send_media to send them again.]"
         
         return final_result
