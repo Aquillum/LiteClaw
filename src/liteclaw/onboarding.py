@@ -264,15 +264,26 @@ def setup_bridges(current_config=None):
 
     if "WhatsApp (requires phone scan)" in bridges:
         config["WHATSAPP_TYPE"] = "node_bridge"
-        limit = questionary.confirm("Limit WhatsApp numbers?", default=bool(current_config.get("WHATSAPP_ALLOWED_NUMBERS") if current_config else True)).ask()
+        console.print("\n[yellow]💡 WhatsApp Setup Guide:[/yellow]")
+        console.print("1. We use a real browser instance (Puppeteer) to connect to WhatsApp Web.")
+        console.print("2. You will scan a QR code once, and session will be saved locally.")
+        console.print("3. Supports Multi-Device login (phone doesn't need to be online).\n")
+        
+        limit = questionary.confirm("Limit allowed phone numbers?", default=bool(current_config.get("WHATSAPP_ALLOWED_NUMBERS") if current_config else True)).ask()
         if limit:
             existing = ",".join(current_config.get("WHATSAPP_ALLOWED_NUMBERS", [])) if current_config else ""
-            nums = questionary.text("Allowed Numbers (comma-sep, without +):", default=existing).ask()
+            console.print("[dim]Enter numbers with country code, no + or spaces (e.g. 919876543210)[/dim]")
+            nums = questionary.text("Allowed Numbers (comma-sep):", default=existing).ask()
             if nums: config["WHATSAPP_ALLOWED_NUMBERS"] = [n.strip() for n in nums.split(",") if n.strip()]
 
     if "Telegram (requires Bot Token)" in bridges:
+        console.print("\n[yellow]💡 Telegram Setup Guide:[/yellow]")
+        console.print("1. Message @BotFather on Telegram.")
+        console.print("2. Send command /newbot and follow instructions.")
+        console.print("3. Copy the HTTP API Token provided.\n")
+        
         token = questionary.text("Enter TG Token:", default=current_config.get("TELEGRAM_BOT_TOKEN", "") if current_config else "").ask()
-        if token: config["TELEGRAM_BOT_TOKEN"] = token
+        if token: config["TELEGRAM_BOT_TOKEN"] = token.strip()
 
     if "Slack (requires Bot Token)" in bridges:
         console.print("\n[yellow]💡 Slack Setup Guide:[/yellow]")
