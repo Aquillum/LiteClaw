@@ -420,15 +420,39 @@ if (SLACK_BOT_TOKEN && SLACK_APP_TOKEN) {
         socketMode: true,
     });
 
+    // Simple cache for Slack user info to reduce API calls
+    const slackUserCache = new Map();
+
+    async function getSlackUserName(userId) {
+        if (slackUserCache.has(userId)) return slackUserCache.get(userId);
+        try {
+            const result = await global.slackApp.client.users.info({ user: userId });
+            if (result.ok && result.user) {
+                const name = result.user.real_name || result.user.name;
+                slackUserCache.set(userId, name);
+                // Clear cache after 1 hour
+                setTimeout(() => slackUserCache.delete(userId), 3600000);
+                return name;
+            }
+        } catch (e) {
+            console.error('[Slack] Error fetching user info:', e.message);
+        }
+        return userId; // Fallback to ID
+    }
+
     // Helper function to forward messages to Python backend
-    async function forwardToLiteClaw(channel, text, user, ts, eventType) {
+    async function forwardToLiteClaw(channel, text, userId, ts, eventType) {
+        if (!text) return; // Skip events without text (like edits or just emoji reactions sometimes)
+
         // Clean the message text - remove the bot mention if present
         let cleanText = text.replace(/<@[A-Z0-9]+>/g, '').trim();
 
         if (!cleanText) {
-            console.log(`[Slack] Empty message after cleaning, skipping.`);
+            console.log(`[Slack] Empty message after cleaning mentions, skipping.`);
             return;
         }
+
+        const realName = await getSlackUserName(userId);
 
         const payload = {
             platform: 'slack',
@@ -436,11 +460,11 @@ if (SLACK_BOT_TOKEN && SLACK_APP_TOKEN) {
             from: channel, // Channel ID as session key
             body: cleanText,
             timestamp: parseFloat(ts),
-            senderName: user || "Slack User",
+            senderName: realName,
             fromMe: false
         };
 
-        console.log(`[Slack] [${eventType}] From ${user} in ${channel}: ${cleanText}`);
+        console.log(`[Slack] [${eventType}] From ${realName} (${userId}) in ${channel}: ${cleanText}`);
 
         // Acknowledge to Slack immediately (Async)
         axios.post(PYTHON_BACKEND_URL, payload).then(() => {
@@ -452,18 +476,17 @@ if (SLACK_BOT_TOKEN && SLACK_APP_TOKEN) {
 
     // Capture everything for debugging
     slackApp.message(async ({ message }) => {
-        console.log(`[Slack DEBUG] Generic message event: ${message.text ? message.text.substring(0, 20) : 'No text'}`);
-
         // Handle DMs (im) and Group DMs (mpim)
         if (message.channel_type === 'im' || message.channel_type === 'mpim') {
             if (message.bot_id || message.subtype === 'bot_message') return;
+            // console.log(`[Slack DEBUG] DM received: ${message.text}`);
             await forwardToLiteClaw(message.channel, message.text, message.user, message.ts, 'DM');
         }
     });
 
     // Handle Mentions specifically
     slackApp.event('app_mention', async ({ event }) => {
-        console.log(`[Slack DEBUG] Mention event caught.`);
+        // console.log(`[Slack DEBUG] Mention event caught: ${event.text}`);
         await forwardToLiteClaw(event.channel, event.text, event.user, event.ts, 'Mention');
     });
 
