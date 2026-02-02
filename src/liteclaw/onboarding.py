@@ -248,6 +248,101 @@ def setup_llm(current_config=None):
         "LLM_MODEL": model
     }
 
+def setup_vision_llm(current_config, main_llm_config):
+    """
+    Setup a separate Vision LLM if the main model is not vision-capable.
+    """
+    # Simple heuristic to check if main model is vision-capable
+    main_model = main_llm_config.get("LLM_MODEL", "").lower()
+    vision_keywords = ["gpt-4o", "gemini", "claude-3", "vision", "vl", "pixtral", "llava"]
+    is_vision_capable = any(k in main_model for k in vision_keywords)
+    
+    console.print("\n[bold]1.1. Vision Model Setup[/bold]")
+    if is_vision_capable:
+        console.print(f"[green]✅ Main model '{main_model}' appears to have Vision capabilities.[/green]")
+        use_separate = questionary.confirm(
+            "Do you want to configure a separate Vision Model anyway? (Not needed usually)", 
+            default=False
+        ).ask()
+        if not use_separate:
+            return {}
+    else:
+        console.print(f"[yellow]⚠️ Main model '{main_model}' is likely text-only.[/yellow]")
+        console.print("[dim]For desktop automation, a Vision Model is REQUIRED.[/dim]")
+        use_separate = questionary.confirm(
+            "Configure a separate Vision Model? (Recommended)", 
+            default=True
+        ).ask()
+        if not use_separate:
+            return {}
+
+    console.print("\n[bold]Select Vision LLM Provider:[/bold]")
+    
+    # Reuse providers logic but filter/sort for vision
+    provider_choices = []
+    for name, config in PROVIDERS.items():
+        # Tag known vision providers
+        if name in ["OpenRouter", "OpenAI", "Google", "Anthropic"]:
+             provider_choices.append(f"{name} - {config['description']}")
+        else:
+             provider_choices.append(f"{name} - {config['description']}")
+
+    # Determine default
+    default_choice = provider_choices[1]  # OpenRouter
+    
+    selected = questionary.select(
+        "Select Vision Provider:",
+        choices=provider_choices,
+        default=default_choice
+    ).ask()
+    if not selected: return {}
+    
+    provider_name = selected.split(" - ")[0].strip()
+    provider_config = PROVIDERS[provider_name]
+    
+    # API Key
+    api_key = ""
+    # Check if we can reuse main API key if provider matches
+    if main_llm_config.get("LLM_PROVIDER") == provider_config["provider"] and main_llm_config.get("LLM_API_KEY"):
+         reuse_key = questionary.confirm(f"Reuse API Key from main configuration?", default=True).ask()
+         if reuse_key:
+             api_key = main_llm_config.get("LLM_API_KEY")
+
+    if not api_key and provider_config["api_key_env"]:
+        existing_key = current_config.get("VISION_LLM_API_KEY", "") if current_config else ""
+        api_key = questionary.password(
+            f"Enter Vision API Key for {provider_name}:",
+            default=existing_key
+        ).ask()
+        if api_key: api_key = api_key.strip()
+    
+    # Base URL
+    base_url = provider_config["base_url"]
+    if main_llm_config.get("LLM_PROVIDER") == provider_config["provider"]:
+        base_url = main_llm_config.get("LLM_BASE_URL", base_url)
+
+    # Model Selection
+    model_choices = provider_config["models"] + ["Enter custom model name"]
+    
+    console.print(f"\n[bold]Select Vision Model:[/bold]")
+    model = questionary.select(
+        "Choose a model:",
+        choices=model_choices
+    ).ask()
+    
+    if model == "Enter custom model name":
+        model = questionary.text("Enter full model name:").ask()
+    else:
+        if not model.startswith(provider_config["model_prefix"]):
+            model = f"{provider_config['model_prefix']}{model}"
+
+    return {
+        "VISION_LLM_PROVIDER": provider_config["provider"],
+        "VISION_LLM_BASE_URL": base_url,
+        "VISION_LLM_API_KEY": api_key,
+        "VISION_LLM_MODEL": model
+    }
+
 
 def setup_bridges(current_config=None):
     console.print("\n[bold]2. Messaging Bridges[/bold]")
@@ -535,6 +630,9 @@ def onboarding():
     
     llm_config = setup_llm(current_config)
     if not llm_config: return
+    
+    vision_config = setup_vision_llm(current_config, llm_config)
+    llm_config.update(vision_config)
     
     bridge_config = setup_bridges(current_config)
     if bridge_config is None: return

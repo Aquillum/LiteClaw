@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gpt-4o"
     LLM_BASE_URL: Optional[str] = None
     
+    # Vision LLM (for Vision Agent) - Falls back to Main LLM if not set
+    VISION_LLM_PROVIDER: Optional[str] = None
+    VISION_LLM_MODEL: Optional[str] = None
+    VISION_LLM_API_KEY: Optional[str] = None
+    VISION_LLM_BASE_URL: Optional[str] = None
+    
     # WhatsApp Config (Selenium/Node)
     WHATSAPP_TYPE: str = "selenium" # or "cloud_api" or "node_bridge"
     WHATSAPP_ALLOWED_NUMBERS: Optional[list[str]] = None # Pulse numbers allowed to interact

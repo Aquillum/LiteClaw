@@ -18,10 +18,11 @@ BASE_SYSTEM_PROMPT = """
    - **Linux/Mac**: Use Bash.
    - **Complex Commands**: For commands with JSON, nested quotes, or multi-line logic, ALWAYS write to a script file (.ps1/.sh) first and then execute the file. This avoids WinError 267 and parsing issues.
 5. **File Management**: Always use absolute paths. Use the designated work directory for temporary files unless specified.
-6. **Web Browsing**:
-   - Use `fetch_url_content` for documentation and simple data gathering.
-   - Use `browser_task` ONLY when absolute necessary (dynamic JS, complex flows, human-in-the-loop tasks).
-   - The browser agent can ask the user for help mid-task (passwords, OTPs, choices).
+6. **Web Browsing & Desktop Control**:
+   - **`vision_task` (PRIMARY)**: Use this for ALL general desktop tasks, including interacting with installed applications (VS Code, Photoshop, Notepad) and *existing* user browsers (e.g., controlling the user's open Brave/Chrome window). This is your default way to "see" and "act" on the computer.
+   - **`browser_task` (SECONDARY/ISOLATED)**: Use this ONLY when the user specifically asks for a *new*, *isolated*, or *headless* browser session, or for background data scraping where UI interaction is not needed. Do NOT use this to interact with the user's current screen or open apps.
+   - **`fetch_url_content`**: Use for quick documentation reading and simple data gathering (fastest).
+   - The vision agent can also ask the user for help mid-task (`ASK_USER`).
 7. **Task Efficiency**: STOP immediately once the goal is achieved. Do not perform extraneous steps.
 8. **Payment Handling**: If a browser task reaches a checkout screen, use `ask_human` to request payment details. DO NOT complete the task until the order is confirmed or the user asks to stop.
 9. **Evolution**: Update your memories (SOUL) and persona (PERSONALITY) frequently using `update_soul` and `update_personality`.
@@ -198,7 +199,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "browser_task",
-            "description": "Perform tasks in a real browser. USE THIS ONLY IF the user explicitly requests to 'use the browser' or for tasks that strictly require UI interaction (filling forms, clicking buttons). Default to fetch_url_content for reading.",
+            "description": "Legacy/Isolated browser tool. Use ONLY for independent, background, or headless web tasks. Do NOT use this to interact with the user's current screen. For general web interaction on the user's desktop, use 'vision_task' instead.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -260,6 +261,21 @@ TOOLS = [
                     "caption": {"type": "string", "description": "Optional caption for the GIF."}
                 },
                 "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "vision_task",
+            "description": "PRIMARY tool for controlling the computer. Use this to click, type, and interact with ANY application on the screen (Windows, Apps, Browsers). Use this when asked to 'open Brave', 'use VS Code', 'check my email', etc.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal": {"type": "string", "description": "The goal or instruction for the vision agent."},
+                    "max_steps": {"type": "integer", "default": 15, "description": "Maximum steps allowed."}
+                },
+                "required": ["goal"]
             }
         }
     }
@@ -587,6 +603,20 @@ class LiteClawAgent:
                                     except Exception as e:
                                         tool_output = f"Failed to send media: {str(e)}"
                                 yield f">>> [Media Result]: {tool_output}\n"
+
+                            elif func_name == "vision_task":
+                                from .vision_agent import VisionAgent
+                                goal = func_args.get("goal")
+                                steps = func_args.get("max_steps", 15)
+                                yield f">>> [Vision]: Starting agent with goal: {goal}\n"
+                                
+                                try:
+                                    v_agent = VisionAgent(goal, session_id, platform, max_steps=steps)
+                                    tool_output = v_agent.run()
+                                except Exception as e:
+                                    tool_output = f"Vision Agent Failed: {str(e)}"
+                                
+                                yield f">>> [Vision Result]: {tool_output}\n"
 
                             elif func_name == "search_and_send_gif":
                                 yield f">>> [GIF]: Searching for '{func_args.get('query')}'...\n"
