@@ -26,7 +26,7 @@ Just like its powerful parent project OpenClaw, LiteClaw (the lite mini version)
 ## ✨ Features
 
 - 🤖 **Multi-LLM Support**: Works with OpenAI, OpenRouter, Groq, DeepSeek, and local models (Ollama)
-- 👁️ **Vision OS Control**: Control your computer via mouse movements and keyboard commands (Powered by Gemini 2.0 Flash)
+- 👁️ **Vision OS Control**: Control your computer via mouse movements and keyboard commands (Powered by Gemini 3 Flash and other Vision models)
 - 📡 **Multi-Channel Support**: [WhatsApp, Telegram, Slack](CHANNELS.md)
 - 🌐 **Browser Automation**: Powered by `browser-use` for web tasks
 - 💓 **Proactive Heartbeat**: Define periodic autonomous tasks in `HEARTBEAT.md`
