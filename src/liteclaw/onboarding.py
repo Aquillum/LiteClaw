@@ -148,6 +148,31 @@ def setup_work_dir(current_config=None):
         return work_dir
     return None
 
+def check_system_dependencies():
+    console.print("\n[bold]⚙️ Checking System Dependencies...[/bold]")
+    
+    # 1. Check Node.js
+    node_ok = False
+    try:
+        subprocess.run(["node", "--version"], capture_output=True, check=True)
+        console.print("[green]✓ Node.js found[/green]")
+        node_ok = True
+    except:
+        console.print("[red]✗ Node.js NOT found! Please install Node.js (v18+) for messaging bridges.[/red]")
+    
+    # 2. Check Python Vision Libraries
+    vision_ok = True
+    try:
+        import pyautogui
+        import PIL
+        console.print("[green]✓ Vision dependencies found (pyautogui, Pillow)[/green]")
+    except ImportError:
+        console.print("[yellow]⚠ Vision dependencies missing. Deskstop automation will be limited.[/yellow]")
+        console.print("[dim]Run: pip install pyautogui Pillow[/dim]")
+        vision_ok = False
+        
+    return node_ok
+
 def setup_llm(current_config=None):
     console.print("\n[bold]1. LLM Provider Setup[/bold]")
     console.print("[dim]💡 Tip: OpenRouter gives access to 200+ models with a single API key[/dim]\n")
@@ -403,6 +428,22 @@ def setup_bridges(current_config=None):
         
     return config
 
+def setup_autonomous_systems():
+    console.print("\n[bold]3. Autonomous Systems Setup[/bold]")
+    console.print("[dim]💡 LiteClaw includes background systems that work while you sleep.[/dim]\n")
+    
+    console.print("[bold cyan]💓 Heartbeat Monitor[/bold cyan]")
+    console.print("  - Periodically executes routine tasks defined in HEARTBEAT.md.")
+    console.print("  - Default: Every 1 hour.")
+    
+    console.print("\n[bold cyan]🧠 Subconscious Innovator[/bold cyan]")
+    console.print("  - Surfaces random technical insights and experimental tasks.")
+    console.print("  - Learns from environment even when you aren't chatting.")
+    
+    console.print("\n[yellow]Note: You can configure these later by editing HEARTBEAT.md and SUBCONSCIOUS.md in your work directory.[/yellow]")
+    
+    return True
+
 def pair_whatsapp(bridge_dir, work_dir, config_data):
     """Start bridge and wait for WhatsApp QR login during onboarding."""
     console.print("\n[bold]📱 WhatsApp Pairing[/bold]")
@@ -593,7 +634,7 @@ def save_config(config_data):
 
 def migrate_files(work_dir):
     configs_dir = os.path.join(work_dir, "configs")
-    core_files = ["AGENT.md", "SOUL.md", "PERSONALITY.md"]
+    core_files = ["AGENT.md", "SOUL.md", "PERSONALITY.md", "SUBCONSCIOUS.md", "HEARTBEAT.md"]
     md_files = [f for f in os.listdir(".") if f.endswith(".md")]
     pkg_dir = os.path.dirname(__file__)
     to_copy = []
@@ -618,6 +659,8 @@ def onboarding():
     clear_screen()
     console.print(Panel.fit("[bold cyan]🦞 LiteClaw - Adaptive AI Gateway[/bold cyan]\n[dim]Onboarding Wizard[/dim]", border_style="cyan"))
     
+    check_system_dependencies()
+    
     # Check for existing config to preload
     current_config = {}
     if os.path.exists(CONFIG_FILE):
@@ -636,6 +679,8 @@ def onboarding():
     
     bridge_config = setup_bridges(current_config)
     if bridge_config is None: return
+
+    setup_autonomous_systems()
 
     config_data = {**llm_config, **bridge_config, "WORK_DIR": work_dir}
     
