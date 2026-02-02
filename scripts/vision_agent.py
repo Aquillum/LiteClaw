@@ -25,7 +25,7 @@ except ImportError:
 # --- Configuration ---
 API_BASE = "https://openrouter.ai/api/v1"
 # Default key from previous context or env
-DEFAULT_API_KEY = "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"
+DEFAULT_API_KEY = ""
 API_KEY = os.getenv("LLM_API_KEY", DEFAULT_API_KEY)
 MODEL_NAME = "google/gemini-3-flash-preview"
 
