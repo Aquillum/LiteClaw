@@ -154,11 +154,23 @@ def check_system_dependencies():
     # 1. Check Node.js
     node_ok = False
     try:
-        subprocess.run(["node", "--version"], capture_output=True, check=True)
-        console.print("[green]✓ Node.js found[/green]")
-        node_ok = True
-    except:
+        # Check version
+        result = subprocess.run(["node", "--version"], capture_output=True, text=True, check=True)
+        version_str = result.stdout.strip()
+        # Parse version (e.g., v18.12.1 -> 18)
+        major_version = int(version_str.lstrip('v').split('.')[0])
+        
+        if major_version < 18:
+            console.print(f"[red]⚠ Node.js version {version_str} is TOO OLD.[/red]")
+            console.print("[yellow]LiteClaw requires Node.js v18 or higher for messaging bridges.[/yellow]")
+            console.print("[dim]Please upgrade Node.js: https://nodejs.org[/dim]")
+        else:
+            console.print(f"[green]✓ Node.js {version_str} found[/green]")
+            node_ok = True
+    except (subprocess.CalledProcessError, FileNotFoundError):
         console.print("[red]✗ Node.js NOT found! Please install Node.js (v18+) for messaging bridges.[/red]")
+    except Exception as e:
+        console.print(f"[yellow]⚠ Error checking Node.js: {e}[/yellow]")
     
     # 2. Check Python Vision Libraries
     vision_ok = True
