@@ -19,6 +19,7 @@ def get_file_path(filename: str) -> str:
 AGENT_FILE = get_file_path("AGENT.md")
 SOUL_FILE = get_file_path("SOUL.md")
 PERSONALITY_FILE = get_file_path("PERSONALITY.md")
+SUBCONSCIOUS_FILE = get_file_path("SUBCONSCIOUS.md")
 
 def read_file_content(filepath):
     if not os.path.exists(filepath):
@@ -37,6 +38,9 @@ def get_soul_memory():
 
 def get_personality_memory():
     return read_file_content(PERSONALITY_FILE)
+
+def get_subconscious_memory():
+    return read_file_content(SUBCONSCIOUS_FILE)
 
 def update_soul_memory(content: str):
     """
@@ -70,3 +74,15 @@ def update_personality_memory(content: str):
         return "Personality updated successfully."
     except Exception as e:
         return f"Failed to update Personality: {e}"
+
+def update_subconscious_memory(content: str):
+    """
+    Overwrites SUBCONSCIOUS.md with new content.
+    Stores innovations, error patterns, and experimental ideas.
+    """
+    try:
+        with open(SUBCONSCIOUS_FILE, "w", encoding="utf-8") as f:
+            f.write(content)
+        return "Subconscious updated successfully."
+    except Exception as e:
+        return f"Failed to update Subconscious: {e}"

@@ -24,7 +24,11 @@ BASE_SYSTEM_PROMPT = """
    - The vision agent can also ask the user for help mid-task (`ASK_USER`).
 7. **Task Efficiency**: STOP immediately once the goal is achieved. Do not perform extraneous steps.
 8. **Payment Handling**: If a browser task reaches a checkout screen, use `ask_human` to request payment details. DO NOT complete the task until the order is confirmed or the user asks to stop.
-9. **Evolution**: Update your memories (SOUL) and persona (PERSONALITY) frequently using `update_soul` and `update_personality`.
+9. **Evolution**: Update your memories (SOUL, PERSONALITY, and SUBCONSCIOUS) frequently.
+   - **SOUL**: User facts and preferences.
+   - **PERSONALITY**: Your persona, emotions, and internal rules.
+   - **SUBCONSCIOUS**: Innovative ideas, error patterns, lessons learned, and experimental plans for the computer environment.
+10. **Subconscious Invocation**: Your subconscious may occasionally surface with innovative ideas or realizations about previous failures. Use these to improve your performance autonomously.
 10. **Media Duplication Prevention**: 
     - When `vision_task` or other tools send media, do NOT duplicate it.
     - Only use `send_media` if explicitly requested or if sending NEW content not captured by the tool.
@@ -55,6 +59,10 @@ def get_system_prompt():
     if personality_memory:
         prompt += f"\n\n## PERSONALITY (Your Evolution / State)\n{personality_memory}\n"
         
+    subconscious_memory = get_subconscious_memory()
+    if subconscious_memory:
+        prompt += f"\n\n## SUBCONSCIOUS (Innovations / Lessons / Experiments)\n{subconscious_memory}\n"
+
     return prompt
 
 SYSTEM_PROMPT = get_system_prompt()
@@ -98,6 +106,20 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "content": {"type": "string", "description": "The updated PERSONALITY.md content including new traits, emotions, or rules."}
+                },
+                "required": ["content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_subconscious",
+            "description": "Store innovative ideas, error patterns, technical realizations, or experimental computer tasks for future autonomous action. Use this to 'learn' from your environment.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "content": {"type": "string", "description": "The new content for your subconscious memory."}
                 },
                 "required": ["content"]
             }
@@ -395,6 +417,12 @@ class LiteClawAgent:
                             elif func_name == "update_personality":
                                 yield f">>> [Personality]: Evolving...\n"
                                 tool_output = update_personality_memory(func_args.get("content"))
+                                yield f">>> [Result]: {tool_output}\n"
+
+                            elif func_name == "update_subconscious":
+                                yield f">>> [Subconscious]: Storing insight...\n"
+                                from .meta_memory import update_subconscious_memory
+                                tool_output = update_subconscious_memory(func_args.get("content"))
                                 yield f">>> [Result]: {tool_output}\n"
 
                             # ... [Other tool handlers remain here, simply consolidated logic below] ...

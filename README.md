@@ -29,7 +29,8 @@ Just like its powerful parent project OpenClaw, LiteClaw (the lite mini version)
 - 👁️ **Vision OS Control**: Cross-platform control (Windows, Linux, MacOS) via mouse movements and keyboard commands (Powered by Gemini 3 Flash and other Vision models)
 - 📡 **Multi-Channel Support**: [WhatsApp, Telegram, Slack](CHANNELS.md)
 - 💓 **Proactive Heartbeat**: Define periodic autonomous tasks in `HEARTBEAT.md`
-- 🧠 **Adaptive Personality**: Soul/Personality memory that evolves over time
+- 🧠 **Adaptive Personality**: Soul/Personality/Subconscious memory that evolves over time
+- 💡 **Autonomous Innovation**: A built-in "Subconscious" system that triggers random technical experiments and self-improvement tasks
 - 🔧 **Shell Execution**: Run terminal commands safely
 - 📅 **Cron Jobs**: Schedule recurring tasks via API
 - 🧵 **Sub-Agents**: Delegate long-running tasks to background agents

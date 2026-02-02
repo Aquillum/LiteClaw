@@ -20,6 +20,10 @@ async def startup_event():
     # Start Heartbeat Monitor
     from .heartbeat import heartbeat
     heartbeat.start()
+    
+    # Start Subconscious Innovator
+    from .subconscious import subconscious_innovator
+    subconscious_innovator.start()
 
 class CreateSessionRequest(BaseModel):
     session_id: Optional[str] = None
