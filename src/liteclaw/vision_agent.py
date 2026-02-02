@@ -92,23 +92,30 @@ You must output a JSON object describing the next action to take.
    - Required fields: "text" (string to type)
 3. **HOTKEY**: Press a key combination.
    - Required fields: "keys" (list of strings, e.g. ["ctrl", "c"], ["enter"], ["win"])
-4. **WAIT**: Wait for a few seconds.
+4. **SCROLL**: Scroll the mouse wheel.
+   - Required fields: "direction" ("up" | "down"), "amount" (integer, e.g. 3)
+5. **MOVE_TO**: Move the mouse without clicking.
+   - Required fields: "point" ([x, y] normalized 0-1000)
+6. **WAIT**: Wait for a few seconds.
    - Required fields: "duration" (float, seconds)
-5. **ASK_USER**: Pause execution and ask the user for help, decision, or data.
+7. **ASK_USER**: Pause execution and ask the user for help, decision, or data.
    - Required fields: "question" (string)
-6. **FINISH**: Goal is achieved or impossible.
+8. **FINISH**: Goal is achieved or impossible.
    - Required fields: "reason" (string)
 
 ### Response Format (Strict JSON)
 {
   "thought": "Brief reasoning about what to do next based on the screen.",
-  "action": "CLICK" | "TYPE" | "HOTKEY" | "WAIT" | "ASK_USER" | "FINISH",
-  "bbox": [ymin, xmin, ymax, xmax],  // Only for CLICK
-  "text": "some text",               // Only for TYPE
-  "keys": ["key1", "key2"],          // Only for HOTKEY
-  "duration": 2.5,                   // Only for WAIT
-  "question": "Which file?",         // Only for ASK_USER
-  "reason": "Task done."             // Only for FINISH
+  "action": "CLICK" | "TYPE" | "HOTKEY" | "SCROLL" | "MOVE_TO" | "WAIT" | "ASK_USER" | "FINISH",
+  "bbox": [ymin, xmin, ymax, xmax],  // For CLICK
+  "text": "some text",               // For TYPE
+  "keys": ["key1", "key2"],          // For HOTKEY
+  "direction": "down",               // For SCROLL
+  "amount": 3,                       // For SCROLL
+  "point": [500, 500],               // For MOVE_TO
+  "duration": 2.5,                   // For WAIT
+  "question": "Which file?",         // For ASK_USER
+  "reason": "Task done."             // For FINISH
 }
 Do not return markdown code blocks. Just the raw JSON string.
 """
@@ -159,6 +166,24 @@ Do not return markdown code blocks. Just the raw JSON string.
             keys = action_data.get("keys", [])
             pyautogui.hotkey(*keys)
             return f"Keys pressed: {keys}"
+
+        elif action_type == "SCROLL":
+            direction = action_data.get("direction", "down")
+            amount = action_data.get("amount", 3)
+            # PyAutoGUI scroll amount varies by OS, but usually 3-10 is a 'click'
+            scroll_val = -amount if direction == "down" else amount
+            pyautogui.scroll(scroll_val * 100) # Scaling for noticeable movement
+            return f"Scrolled {direction} by {amount}"
+
+        elif action_type == "MOVE_TO":
+            point = action_data.get("point")
+            if point:
+                px, py = point
+                target_x = int((px / 1000) * self.screen_width)
+                target_y = int((py / 1000) * self.screen_height)
+                pyautogui.moveTo(target_x, target_y, duration=0.5)
+                return f"Moved cursor to ({target_x}, {target_y})"
+            return "Error: MOVE_TO missing point"
 
         elif action_type == "WAIT":
             duration = action_data.get("duration", 1)
