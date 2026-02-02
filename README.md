@@ -2,7 +2,7 @@
 
 **Lightweight Light Weight AI Assistant**
 
-LiteClaw is a lite weight AI Assistant gateway that connects LLMs to your world through messaging platforms (WhatsApp, Telegram, Slack) and enables powerful capabilities like browser automation, shell execution, and proactive task management.
+LiteClaw is a lite weight AI Assistant gateway that connects LLMs to your world through messaging platforms (WhatsApp, Telegram, Slack). It enables powerful capabilities like **Vision-powered OS control** (mouse/keyboard), browser automation, shell execution, and proactive task management.
 
 <p align="center">
   <img src="assets/logo.png" width="300" alt="LiteClaw Logo">
@@ -26,6 +26,7 @@ Just like its powerful parent project OpenClaw, LiteClaw (the lite mini version)
 ## ✨ Features
 
 - 🤖 **Multi-LLM Support**: Works with OpenAI, OpenRouter, Groq, DeepSeek, and local models (Ollama)
+- 👁️ **Vision OS Control**: Control your computer via mouse movements and keyboard commands (Powered by Gemini 2.0 Flash)
 - 📡 **Multi-Channel Support**: [WhatsApp, Telegram, Slack](CHANNELS.md)
 - 🌐 **Browser Automation**: Powered by `browser-use` for web tasks
 - 💓 **Proactive Heartbeat**: Define periodic autonomous tasks in `HEARTBEAT.md`
