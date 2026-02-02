@@ -118,6 +118,12 @@ def run(port, host, no_bridge):
                                 env["TELEGRAM_BOT_TOKEN"] = data["TELEGRAM_BOT_TOKEN"]
                             if data.get("SLACK_BOT_TOKEN"):
                                 env["SLACK_BOT_TOKEN"] = data["SLACK_BOT_TOKEN"]
+                            if data.get("SLACK_APP_TOKEN"):
+                                env["SLACK_APP_TOKEN"] = data["SLACK_APP_TOKEN"]
+                            if data.get("SLACK_SIGNING_SECRET"):
+                                env["SLACK_SIGNING_SECRET"] = data["SLACK_SIGNING_SECRET"]
+                            if data.get("WHATSAPP_TYPE"):
+                                env["WHATSAPP_TYPE"] = data["WHATSAPP_TYPE"]
                             if data.get("WORK_DIR"):
                                 env["WORK_DIR"] = data["WORK_DIR"]
                     except:

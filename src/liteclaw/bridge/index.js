@@ -19,6 +19,7 @@ let TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 let SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 let SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN;
 let SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
+let WHATSAPP_TYPE = process.env.WHATSAPP_TYPE;
 
 // Try to load additional config from config.json (checks root and WORK_DIR)
 function loadConfigs() {
@@ -46,6 +47,7 @@ function loadConfigs() {
                 if (!SLACK_BOT_TOKEN) SLACK_BOT_TOKEN = config.SLACK_BOT_TOKEN;
                 if (!SLACK_APP_TOKEN) SLACK_APP_TOKEN = config.SLACK_APP_TOKEN;
                 if (!SLACK_SIGNING_SECRET) SLACK_SIGNING_SECRET = config.SLACK_SIGNING_SECRET;
+                if (!WHATSAPP_TYPE) WHATSAPP_TYPE = config.WHATSAPP_TYPE;
                 console.log(`[Bridge] Loaded config from: ${configPath}`);
                 break;
             }
@@ -55,137 +57,141 @@ function loadConfigs() {
 
 loadConfigs();
 
-// 1. Setup WhatsApp Session Path in WORK_DIR
-const sessionDataPath = path.join(WORK_DIR, 'sessions', 'whatsapp');
-if (!fs.existsSync(sessionDataPath)) {
-    fs.mkdirSync(sessionDataPath, { recursive: true });
+let client = null;
+
+if (WHATSAPP_TYPE === 'node_bridge' || (!TELEGRAM_TOKEN && !SLACK_BOT_TOKEN)) {
+    console.log(`[Bridge] Initializing WhatsApp Client (Type: ${WHATSAPP_TYPE || 'default'})...`);
+
+    // 1. Setup WhatsApp Session Path in WORK_DIR
+    const sessionDataPath = path.join(WORK_DIR, 'sessions', 'whatsapp');
+    if (!fs.existsSync(sessionDataPath)) {
+        fs.mkdirSync(sessionDataPath, { recursive: true });
+    }
+
+    client = new Client({
+        authStrategy: new LocalAuth({
+            clientId: "client-one",
+            dataPath: sessionDataPath // <--- Save session in WORK_DIR
+        }),
+        puppeteer: {
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--unhandled-rejections=strict']
+        }
+    });
+
+    client.on('qr', (qr) => {
+        console.log('QR RECEIVED - Scan with your phone:');
+        const isLarge = process.env.QR_LARGE === 'true';
+        if (isLarge) console.log("[Info] Using Large QR mode for better compatibility.");
+        qrcode.generate(qr, { small: !isLarge });
+
+        // Fallback: Save to HTML file in WORK_DIR with auto-refresh
+        try {
+            const qrHtmlPath = path.join(WORK_DIR, 'qr.html');
+            const htmlContent = `
+            <html>
+            <head>
+                <title>LiteClaw WhatsApp Login</title>
+                <meta http-equiv="refresh" content="30">
+                <style>
+                    body { display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:'Inter', sans-serif; background:#f4f7f6; color:#333; margin:0; }
+                    .card { background:white; padding:40px; border-radius:16px; box-shadow:0 10px 25px rgba(0,0,0,0.05); text-align:center; max-width:400px; }
+                    #qrcode { margin:20px auto; padding:10px; background:white; }
+                    h1 { font-weight:700; color:#075e54; margin-bottom:10px; }
+                    p { color:#666; line-height:1.5; }
+                    .status { margin-top:20px; font-size:0.8em; color:#999; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h1>🦞 LiteClaw Login</h1>
+                    <p>Scan the QR code with WhatsApp to connect.</p>
+                    <div id="qrcode"></div>
+                    <div class="status">Waiting for connection...</div>
+                </div>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+                <script>
+                    new QRCode(document.getElementById("qrcode"), {
+                        text: "${qr}",
+                        width: 256,
+                        height: 256,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.H
+                    });
+                    setTimeout(() => { window.location.reload(); }, 15000); 
+                </script>
+            </body>
+            </html>`;
+            fs.writeFileSync(qrHtmlPath, htmlContent);
+            console.log(`[Bridge] Live QR updated: ${qrHtmlPath}`);
+        } catch (e) { /* ignore */ }
+    });
+
+    client.on('ready', () => {
+        console.log('WhatsApp Client is ready!');
+        // Update HTML to success state before deletion
+        try {
+            const qrHtmlPath = path.join(WORK_DIR, 'qr.html');
+            const successContent = `
+            <html>
+            <body style="display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:sans-serif; background:#e8f5e9;">
+                <div style="background:white; padding:40px; border-radius:16px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.05);">
+                    <h1 style="color:#2e7d32;">✅ Authenticated!</h1>
+                    <p>LiteClaw is now connected to your WhatsApp.</p>
+                    <p style="color:gray;">You can close this window now.</p>
+                </div>
+                <script>setTimeout(() => { window.close(); }, 5000);</script>
+            </body>
+            </html>`;
+            fs.writeFileSync(qrHtmlPath, successContent);
+
+            // Delete after a delay so the user sees the success message
+            setTimeout(() => {
+                if (fs.existsSync(qrHtmlPath)) fs.unlinkSync(qrHtmlPath);
+            }, 10000);
+        } catch (e) { /* ignore */ }
+    });
+
+    client.on('authenticated', () => {
+        console.log('Authenticated successfully!');
+    });
+
+    client.on('message_create', async (msg) => {
+        // Ignore status updates/broadcasts if needed
+        if (msg.from === 'status@broadcast') return;
+
+        // Log everything for debugging
+        if (msg.fromMe) {
+            console.log(`[Self] Sent to ${msg.to}: ${msg.body}`);
+        } else {
+            const senderName = msg._data.notifyName || "Unknown";
+            console.log(`[Incoming] From ${senderName} (${msg.from}): ${msg.body}`);
+        }
+
+        try {
+            // Forward to Python Backend
+            // If I send a message, associate it with the recipient's session (msg.to)
+            // If someone sends me something, associate it with them (msg.from)
+            let sessionKey = msg.fromMe ? msg.to : msg.from;
+
+            await axios.post(PYTHON_BACKEND_URL, {
+                message_id: msg.id._serialized,
+                from: sessionKey,
+                body: msg.body,
+                timestamp: msg.timestamp,
+                senderName: msg._data.notifyName || (msg.fromMe ? "Me" : "Unknown"),
+                fromMe: msg.fromMe
+            });
+        } catch (error) {
+            // console.error('Error forwarding message to Python:', error.message);
+        }
+    });
+
+    client.initialize();
+} else {
+    console.log("[Bridge] WhatsApp is DISABLED (WHATSAPP_TYPE not set or Telegram/Slack is active).");
 }
-
-console.log(`[Bridge] WhatsApp Session Storage: ${sessionDataPath}`);
-
-const client = new Client({
-    authStrategy: new LocalAuth({
-        clientId: "client-one",
-        dataPath: sessionDataPath // <--- Save session in WORK_DIR
-    }),
-    puppeteer: {
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--unhandled-rejections=strict']
-    }
-});
-
-client.on('qr', (qr) => {
-    console.log('QR RECEIVED - Scan with your phone:');
-    const isLarge = process.env.QR_LARGE === 'true';
-    if (isLarge) console.log("[Info] Using Large QR mode for better compatibility.");
-    qrcode.generate(qr, { small: !isLarge });
-
-    // Fallback: Save to HTML file in WORK_DIR with auto-refresh
-    try {
-        const qrHtmlPath = path.join(WORK_DIR, 'qr.html');
-        const htmlContent = `
-        <html>
-        <head>
-            <title>LiteClaw WhatsApp Login</title>
-            <meta http-equiv="refresh" content="30">
-            <style>
-                body { display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:'Inter', sans-serif; background:#f4f7f6; color:#333; margin:0; }
-                .card { background:white; padding:40px; border-radius:16px; box-shadow:0 10px 25px rgba(0,0,0,0.05); text-align:center; max-width:400px; }
-                #qrcode { margin:20px auto; padding:10px; background:white; }
-                h1 { font-weight:700; color:#075e54; margin-bottom:10px; }
-                p { color:#666; line-height:1.5; }
-                .status { margin-top:20px; font-size:0.8em; color:#999; }
-            </style>
-        </head>
-        <body>
-            <div class="card">
-                <h1>LiteClaw Login</h1>
-                <p>Scan the QR code below using WhatsApp on your phone.</p>
-                <div id="qrcode"></div>
-                <div class="status">New QR generated at: ${new Date().toLocaleTimeString()}</div>
-                <p style="color:gray; font-size:0.8em; margin-top:20px;">This page refreshes automatically. Use dark mode terminal for alternative view.</p>
-            </div>
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-            <script>
-                new QRCode(document.getElementById("qrcode"), {
-                    text: "${qr}",
-                    width: 256,
-                    height: 256,
-                    colorDark : "#000000",
-                    colorLight : "#ffffff",
-                    correctLevel : QRCode.CorrectLevel.H
-                });
-                // Small script to check if session is ready by reloading
-                setTimeout(() => { window.location.reload(); }, 15000); 
-            </script>
-        </body>
-        </html>`;
-        fs.writeFileSync(qrHtmlPath, htmlContent);
-        console.log(`[Bridge] Live QR updated: ${qrHtmlPath}`);
-    } catch (e) { /* ignore */ }
-});
-
-client.on('ready', () => {
-    console.log('WhatsApp Client is ready!');
-    // Update HTML to success state before deletion
-    try {
-        const qrHtmlPath = path.join(WORK_DIR, 'qr.html');
-        const successContent = `
-        <html>
-        <body style="display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:sans-serif; background:#e8f5e9;">
-            <div style="background:white; padding:40px; border-radius:16px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.05);">
-                <h1 style="color:#2e7d32;">✅ Authenticated!</h1>
-                <p>LiteClaw is now connected to your WhatsApp.</p>
-                <p style="color:gray;">You can close this window now.</p>
-            </div>
-            <script>setTimeout(() => { window.close(); }, 5000);</script>
-        </body>
-        </html>`;
-        fs.writeFileSync(qrHtmlPath, successContent);
-
-        // Delete after a delay so the user sees the success message
-        setTimeout(() => {
-            if (fs.existsSync(qrHtmlPath)) fs.unlinkSync(qrHtmlPath);
-        }, 10000);
-    } catch (e) { /* ignore */ }
-});
-
-client.on('authenticated', () => {
-    console.log('Authenticated successfully!');
-});
-
-client.on('message_create', async (msg) => {
-    // Ignore status updates/broadcasts if needed
-    if (msg.from === 'status@broadcast') return;
-
-    // Log everything for debugging
-    if (msg.fromMe) {
-        console.log(`[Self] Sent to ${msg.to}: ${msg.body}`);
-    } else {
-        const senderName = msg._data.notifyName || "Unknown";
-        console.log(`[Incoming] From ${senderName} (${msg.from}): ${msg.body}`);
-    }
-
-    try {
-        // Forward to Python Backend
-        // If I send a message, associate it with the recipient's session (msg.to)
-        // If someone sends me something, associate it with them (msg.from)
-        let sessionKey = msg.fromMe ? msg.to : msg.from;
-
-        await axios.post(PYTHON_BACKEND_URL, {
-            message_id: msg.id._serialized,
-            from: sessionKey,
-            body: msg.body,
-            timestamp: msg.timestamp,
-            senderName: msg._data.notifyName || (msg.fromMe ? "Me" : "Unknown"),
-            fromMe: msg.fromMe
-        });
-    } catch (error) {
-        // console.error('Error forwarding message to Python:', error.message);
-    }
-});
-
-client.initialize();
 
 // API to set typing state
 app.post('/whatsapp/typing', async (req, res) => {
@@ -206,7 +212,10 @@ app.post('/whatsapp/typing', async (req, res) => {
             return res.json({ success: true, platform: 'slack' });
         }
 
-        // Default to WhatsApp
+        // WhatsApp
+        if (!client) {
+            throw new Error("WhatsApp client not initialized");
+        }
         const chat = await client.getChatById(to);
         await chat.sendStateTyping();
         res.json({ success: true, platform: 'whatsapp' });
@@ -232,6 +241,9 @@ app.post('/whatsapp/stop-typing', async (req, res) => {
         }
 
         // WhatsApp
+        if (!client) {
+            return res.status(400).json({ error: "WhatsApp client not initialized" });
+        }
         const chat = await client.getChatById(to);
         await chat.clearState();
         res.json({ success: true, platform: 'whatsapp' });
