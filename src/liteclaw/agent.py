@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Generator
 from .config import settings
 from .tools import execute_command
 from .memory import add_message, get_session_history
-from .meta_memory import get_soul_memory, update_soul_memory, get_personality_memory, update_personality_memory, AGENT_FILE
+from .meta_memory import get_soul_memory, update_soul_memory, get_personality_memory, update_personality_memory, get_subconscious_memory, AGENT_FILE
 import litellm
 
 BASE_SYSTEM_PROMPT = """
@@ -544,30 +544,30 @@ class LiteClawAgent:
                             elif func_name == "send_media":
                                 media_type = func_args.get('type')
                                 
-                                    yield f">>> [Media]: Sending {media_type}...\n"
-                                    from .main import WHATSAPP_BRIDGE_URL
-                                    import requests
-                                    
-                                    caption = func_args.get("caption") or ""
-                                    if caption:
-                                        caption = f"[LiteClaw] {caption}"
-                                    else:
-                                        caption = "[LiteClaw]"
+                                yield f">>> [Media]: Sending {media_type}...\n"
+                                from .main import WHATSAPP_BRIDGE_URL
+                                import requests
+                                
+                                caption = func_args.get("caption") or ""
+                                if caption:
+                                    caption = f"[LiteClaw] {caption}"
+                                else:
+                                    caption = "[LiteClaw]"
 
-                                    media_payload = {
-                                        "to": session_id,
-                                        "url_or_path": func_args.get("url_or_path"),
-                                        "caption": caption,
-                                        "type": media_type,
-                                        "platform": platform,
-                                        "is_media": True
-                                    }
-                                    
-                                    try:
-                                        resp = requests.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json=media_payload)
-                                        tool_output = f"Media sent successfully. Status: {resp.status_code}"
-                                    except Exception as e:
-                                        tool_output = f"Failed to send media: {str(e)}"
+                                media_payload = {
+                                    "to": session_id,
+                                    "url_or_path": func_args.get("url_or_path"),
+                                    "caption": caption,
+                                    "type": media_type,
+                                    "platform": platform,
+                                    "is_media": True
+                                }
+                                
+                                try:
+                                    resp = requests.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json=media_payload)
+                                    tool_output = f"Media sent successfully. Status: {resp.status_code}"
+                                except Exception as e:
+                                    tool_output = f"Failed to send media: {str(e)}"
                                 yield f">>> [Media Result]: {tool_output}\n"
 
                             elif func_name == "vision_task":

@@ -1,0 +1,12 @@
+{
+    "LLM_PROVIDER": "OpenRouter",
+    "LLM_BASE_URL": "https://openrouter.ai/api/v1",
+    "LLM_API_KEY": "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",
+    "LLM_MODEL": "google/gemini-3-flash-preview",
+    "WHATSAPP_TYPE": "node_bridge",
+    "WHATSAPP_ALLOWED_NUMBERS": [
+        "917305540292"
+    ],
+    "TELEGRAM_BOT_TOKEN": "8025015077:AAH1yW5662amPMx2z3aNWopu7tkwNc4Rohw",
+    "WORK_DIR": "C:\\liteclaw"
+}
