@@ -12,3 +12,5 @@ httpx
 PyYAML
 apscheduler
 click
+pyautogui
+Pillow

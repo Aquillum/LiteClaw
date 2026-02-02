@@ -254,14 +254,23 @@ app.post('/whatsapp/send', async (req, res) => {
             if (!global.telegramBot) throw new Error("Telegram bot not initialized");
 
             if (is_media) {
-                if (type === 'image' || type === 'gif') {
-                    await global.telegramBot.sendPhoto(to, url_or_path, { caption: caption });
+                // For local files, we must use fs.createReadStream to ensure reliable delivery
+                let mediaSource = url_or_path;
+                if (fs.existsSync(url_or_path)) {
+                    mediaSource = fs.createReadStream(url_or_path);
+                }
+
+                if (type === 'image') {
+                    await global.telegramBot.sendPhoto(to, mediaSource, { caption: caption });
+                } else if (type === 'gif') {
+                    // GIFs are best sent as animations in Telegram
+                    await global.telegramBot.sendAnimation(to, mediaSource, { caption: caption });
                 } else if (type === 'video') {
-                    await global.telegramBot.sendVideo(to, url_or_path, { caption: caption });
+                    await global.telegramBot.sendVideo(to, mediaSource, { caption: caption });
                 } else if (type === 'audio') {
-                    await global.telegramBot.sendAudio(to, url_or_path, { caption: caption });
+                    await global.telegramBot.sendAudio(to, mediaSource, { caption: caption });
                 } else {
-                    await global.telegramBot.sendDocument(to, url_or_path, { caption: caption });
+                    await global.telegramBot.sendDocument(to, mediaSource, { caption: caption });
                 }
             } else {
                 await global.telegramBot.sendMessage(to, message);

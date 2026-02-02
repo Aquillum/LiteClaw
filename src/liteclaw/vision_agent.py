@@ -116,10 +116,17 @@ Do not return markdown code blocks. Just the raw JSON string.
     def parse_response(self, content: str) -> Optional[Dict[str, Any]]:
         cleaned = content.replace("```json", "").replace("```", "").strip()
         try:
+            # Try standard json first
             return json.loads(cleaned)
         except json.JSONDecodeError:
-            print(f"Error parsing JSON: {cleaned}")
-            return None
+            try:
+                # Try json_repair for LLM-jankiness
+                from json_repair import repair_json
+                repaired = repair_json(cleaned)
+                return json.loads(repaired)
+            except Exception as e:
+                print(f"Error parsing JSON: {cleaned} (Error: {e})")
+                return None
 
     def execute_action(self, action_data: Dict[str, Any], screenshot: Any):
         """Executes the action determined by the LLM."""
@@ -198,17 +205,15 @@ Do not return markdown code blocks. Just the raw JSON string.
 
     def _send_screenshot_to_user(self, image: Any, caption: str):
         """Save and send screenshot via bridge."""
-        filename = f"vision_ask_{uuid.uuid4().hex[:8]}.png"
+        filename = f"vision_{uuid.uuid4().hex[:8]}.png"
         path = os.path.join(self.screenshot_dir, filename)
         image.save(path)
         
-        import requests
-        from .main import WHATSAPP_BRIDGE_URL # Ensure this import works or pass URL
-        # Hardcoding default for now if import tricky, but better to fetch
-        BRIDGE_URL = "http://localhost:3040"
-        
         try:
-            requests.post(f"{BRIDGE_URL}/whatsapp/send", json={
+            from .main import WHATSAPP_BRIDGE_URL
+            import requests
+            
+            requests.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json={
                 "to": self.session_id,
                 "message": f"[LiteClaw] 📸 {caption}",
                 "url_or_path": path,
