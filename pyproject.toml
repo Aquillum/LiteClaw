@@ -24,8 +24,6 @@ dependencies = [
     "questionary",
     "selenium",
     "httpx",
-    "browser-use",
-    "langchain-openai",
     "PyYAML",
     "click",
     "apscheduler"

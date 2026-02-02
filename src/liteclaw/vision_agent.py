@@ -61,6 +61,13 @@ class VisionAgent:
         """Captures screen, returns PIL Image and base64 string."""
         if not pyautogui or not Image:
              raise ImportError("Vision dependencies (pyautogui/Pillow) are missing.")
+        
+        # Adapt to screen size dynamically (refresh just in case resolution changed)
+        try:
+            self.screen_width, self.screen_height = pyautogui.size()
+        except:
+            pass
+            
         screenshot = pyautogui.screenshot()
         buffered = BytesIO()
         screenshot.save(buffered, format="PNG")

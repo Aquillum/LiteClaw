@@ -9,8 +9,6 @@ rich
 questionary
 selenium
 httpx
-browser-use
-langchain-openai
 PyYAML
 apscheduler
 click

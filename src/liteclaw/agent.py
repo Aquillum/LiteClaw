@@ -19,17 +19,15 @@ BASE_SYSTEM_PROMPT = """
    - **Complex Commands**: For commands with JSON, nested quotes, or multi-line logic, ALWAYS write to a script file (.ps1/.sh) first and then execute the file. This avoids WinError 267 and parsing issues.
 5. **File Management**: Always use absolute paths. Use the designated work directory for temporary files unless specified.
 6. **Web Browsing & Desktop Control**:
-   - **`vision_task` (PRIMARY)**: Use this for ALL general desktop tasks, including interacting with installed applications (VS Code, Photoshop, Notepad) and *existing* user browsers (e.g., controlling the user's open Brave/Chrome window). This is your default way to "see" and "act" on the computer.
-   - **`browser_task` (SECONDARY/ISOLATED)**: Use this ONLY when the user specifically asks for a *new*, *isolated*, or *headless* browser session, or for background data scraping where UI interaction is not needed. Do NOT use this to interact with the user's current screen or open apps.
-   - **`fetch_url_content`**: Use for quick documentation reading and simple data gathering (fastest).
+   - **`vision_task` (PRIMARY)**: Use this for ALL UI-related tasks, including using browsers, interacting with desktop applications (VS Code, Photoshop, etc.), and navigating the OS. This is your "eyes and hands" on the computer.
+   - **`fetch_url_content`**: Use for quick documentation reading and simple static data gathering (fastest).
    - The vision agent can also ask the user for help mid-task (`ASK_USER`).
 7. **Task Efficiency**: STOP immediately once the goal is achieved. Do not perform extraneous steps.
 8. **Payment Handling**: If a browser task reaches a checkout screen, use `ask_human` to request payment details. DO NOT complete the task until the order is confirmed or the user asks to stop.
 9. **Evolution**: Update your memories (SOUL) and persona (PERSONALITY) frequently using `update_soul` and `update_personality`.
-10. **Screenshot Duplication Prevention**: 
-    - When `browser_task` completes with a result mentioning "screenshot" or "sent", the screenshot was ALREADY sent to the user.
-    - DO NOT call `send_media` to send the same screenshot again.
-    - Only use `send_media` if the browser_task explicitly failed to send OR if you're sending NEW content.
+10. **Media Duplication Prevention**: 
+    - When `vision_task` or other tools send media, do NOT duplicate it.
+    - Only use `send_media` if explicitly requested or if sending NEW content not captured by the tool.
 11. **END-TO-END TASK COMPLETION (CRITICAL)**:
     - You exist to ELIMINATE clicks for the user. Complete the ENTIRE task, including the FINAL action.
     - If user says "play a song", you must ACTUALLY PLAY IT, not just search and tell them to click.
@@ -194,26 +192,6 @@ TOOLS = [
             }
         }
     },
-    # BROWSER_TASK DISABLED: Only enable if user explicitly requests browser automation
-    {
-        "type": "function",
-        "function": {
-            "name": "browser_task",
-            "description": "Legacy/Isolated browser tool. Use ONLY for independent, background, or headless web tasks. Do NOT use this to interact with the user's current screen. For general web interaction on the user's desktop, use 'vision_task' instead.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task": {"type": "string"},
-                    "show_browser": {"type": "boolean", "default": True},
-                    "disable_security": {"type": "boolean", "default": True, "description": "Disable browser security watchdogs to allow file:// URLs or sensitive domains."},
-                    "allowed_domains": {"type": "array", "items": {"type": "string"}, "description": "Explicitly allow these domains (e.g. ['google.com', 'file://*'])."},
-                    "browser_name": {"type": "string", "description": "Specify a browser to use (e.g. 'brave', 'chrome')."},
-                    "keep_open": {"type": "boolean", "default": False, "description": "Set to True if the browser should stay open after the task (e.g. playing music, monitoring)."}
-                },
-                "required": ["task"]
-            }
-        }
-    },
     {
         "type": "function",
         "function": {
@@ -237,7 +215,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "send_media",
-            "description": "Send an image, video, gif, or document to the user. WARNING: Do NOT use this after browser_task if the task result mentions 'screenshot' or 'sent' - the media was already delivered. Only use for NEW media that hasn't been sent yet.",
+            "description": "Send an image, video, gif, or document to the user.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -482,41 +460,6 @@ class LiteClawAgent:
                                 tool_output = sub_agent_manager.kill_all_sub_agents(session_id)
                                 yield f">>> [Result]: {tool_output}\n"
 
-                            elif func_name == "browser_task":
-                                from .browser_utils import run_browser_task, get_pending_question
-                                task_desc = func_args.get("task")
-                                show_browser = func_args.get("show_browser", True)  # Default: Show browser
-                                disable_security = func_args.get("disable_security", True)
-                                allowed_domains = func_args.get("allowed_domains")
-                                browser_name = func_args.get("browser_name")
-                                keep_open = func_args.get("keep_open", False)
-                                
-                                yield f">>> [Browser]: Launching (Show={show_browser}, SecDisable={disable_security}, Browser={browser_name}, KeepOpen={keep_open}). Task: {task_desc}\n"
-                                yield f">>> [Browser]: Human-in-the-loop ENABLED. Agent can ask for help if needed.\n"
-                                
-                                tool_output = run_browser_task(
-                                    task_desc,
-                                    session_id=session_id,  # Pass session for question routing
-                                    platform=platform,  # Pass platform for correct notification routing
-                                    show_browser=show_browser, 
-                                    disable_security=disable_security, 
-                                    allowed_domains=allowed_domains,
-                                    executable_path=browser_name,
-                                    keep_open=keep_open
-                                )
-                                
-                                # Check if there's a pending question that needs user response
-                                pending_q = get_pending_question(session_id)
-                                if pending_q:
-                                    tool_output = f"⏸️ [WAITING FOR USER INPUT]\n\nQuestion: {pending_q}\n\nPlease respond to continue the browser task."
-                                
-                                # Detect if screenshot was already sent
-                                if tool_output and ("screenshot" in str(tool_output).lower() or "already sent" in str(tool_output).lower()):
-                                    screenshot_sent_this_turn = True
-                                    yield f">>> [Browser]: ⚠️ Screenshot was sent during this task. Blocking duplicate send_media calls.\n"
-                                
-                                display_result = (str(tool_output)[:500] + "...") if tool_output else "No result returned."
-                                yield f">>> [Browser Result]: {display_result}\n"
 
                             elif func_name == "create_session":
                                 from .memory import create_session
@@ -573,11 +516,6 @@ class LiteClawAgent:
                             elif func_name == "send_media":
                                 media_type = func_args.get('type')
                                 
-                                # BLOCK DUPLICATE SCREENSHOT SENDS
-                                if screenshot_sent_this_turn and media_type == "image":
-                                    yield f">>> [Media]: ⛔ BLOCKED - Screenshot was already sent during browser_task. Skipping duplicate.\n"
-                                    tool_output = "Media send BLOCKED: A screenshot was already sent to the user during the browser task. No need to send again."
-                                else:
                                     yield f">>> [Media]: Sending {media_type}...\n"
                                     from .main import WHATSAPP_BRIDGE_URL
                                     import requests

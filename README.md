@@ -2,7 +2,7 @@
 
 **Lightweight Light Weight AI Assistant**
 
-LiteClaw is a lite weight AI Assistant gateway that connects LLMs to your world through messaging platforms (WhatsApp, Telegram, Slack). It enables powerful capabilities like **Vision-powered OS control** (mouse/keyboard), browser automation, shell execution, and proactive task management.
+LiteClaw is a lite weight AI Assistant gateway that connects LLMs to your world through messaging platforms (WhatsApp, Telegram, Slack). It enables powerful capabilities like **Vision-powered OS control** (mouse/keyboard) for browsers and desktop apps, shell execution, and proactive task management.
 
 <p align="center">
   <img src="assets/logo.png" width="300" alt="LiteClaw Logo">
@@ -26,9 +26,8 @@ Just like its powerful parent project OpenClaw, LiteClaw (the lite mini version)
 ## ✨ Features
 
 - 🤖 **Multi-LLM Support**: Works with OpenAI, OpenRouter, Groq, DeepSeek, and local models (Ollama)
-- 👁️ **Vision OS Control**: Control your computer via mouse movements and keyboard commands (Powered by Gemini 3 Flash and other Vision models)
+- 👁️ **Vision OS Control**: Cross-platform control (Windows, Linux, MacOS) via mouse movements and keyboard commands (Powered by Gemini 3 Flash and other Vision models)
 - 📡 **Multi-Channel Support**: [WhatsApp, Telegram, Slack](CHANNELS.md)
-- 🌐 **Browser Automation**: Powered by `browser-use` for web tasks
 - 💓 **Proactive Heartbeat**: Define periodic autonomous tasks in `HEARTBEAT.md`
 - 🧠 **Adaptive Personality**: Soul/Personality memory that evolves over time
 - 🔧 **Shell Execution**: Run terminal commands safely
@@ -173,6 +172,5 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## 🙏 Credits
 
 - [LiteLLM](https://github.com/BerriAI/litellm) - Unified LLM API
-- [browser-use](https://github.com/browser-use/browser-use) - Browser automation
 - [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js) - WhatsApp Web API
 
