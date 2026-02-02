@@ -93,28 +93,32 @@ You must output a JSON object describing the next action to take.
 - When you need to click something, return its bounding box: [ymin, xmin, ymax, xmax].
 
 ### Available Actions
-1. **CLICK**: Click on an element.
+1. **CLICK**: Left click on an element.
    - Required fields: "bbox" (normalized [ymin, xmin, ymax, xmax])
-2. **TYPE**: Type text.
+2. **DOUBLE_CLICK**: Double left click on an element (use for opening files/folders).
+   - Required fields: "bbox" (normalized [ymin, xmin, ymax, xmax])
+3. **RIGHT_CLICK**: Right click on an element (use to open context menus).
+   - Required fields: "bbox" (normalized [ymin, xmin, ymax, xmax])
+4. **TYPE**: Type text.
    - Required fields: "text" (string to type)
-3. **HOTKEY**: Press a key combination.
+5. **HOTKEY**: Press a key combination.
    - Required fields: "keys" (list of strings, e.g. ["ctrl", "c"], ["enter"], ["win"])
-4. **SCROLL**: Scroll the mouse wheel.
+6. **SCROLL**: Scroll the mouse wheel.
    - Required fields: "direction" ("up" | "down"), "amount" (integer, e.g. 3)
-5. **MOVE_TO**: Move the mouse without clicking.
+7. **MOVE_TO**: Move the mouse without clicking.
    - Required fields: "point" ([x, y] normalized 0-1000)
-6. **WAIT**: Wait for a few seconds.
+8. **WAIT**: Wait for a few seconds.
    - Required fields: "duration" (float, seconds)
-7. **ASK_USER**: Pause execution and ask the user for help, decision, or data.
+9. **ASK_USER**: Pause execution and ask the user for help, decision, or data.
    - Required fields: "question" (string)
-8. **FINISH**: Goal is achieved or impossible.
-   - Required fields: "reason" (string)
+10. **FINISH**: Goal is achieved or impossible.
+    - Required fields: "reason" (string)
 
 ### Response Format (Strict JSON)
 {
   "thought": "Brief reasoning about what to do next based on the screen.",
-  "action": "CLICK" | "TYPE" | "HOTKEY" | "SCROLL" | "MOVE_TO" | "WAIT" | "ASK_USER" | "FINISH",
-  "bbox": [ymin, xmin, ymax, xmax],  // For CLICK
+  "action": "CLICK" | "DOUBLE_CLICK" | "RIGHT_CLICK" | "TYPE" | "HOTKEY" | "SCROLL" | "MOVE_TO" | "WAIT" | "ASK_USER" | "FINISH",
+  "bbox": [ymin, xmin, ymax, xmax],  // For CLICK, DOUBLE_CLICK, RIGHT_CLICK
   "text": "some text",               // For TYPE
   "keys": ["key1", "key2"],          // For HOTKEY
   "direction": "down",               // For SCROLL
@@ -163,6 +167,42 @@ Do not return markdown code blocks. Just the raw JSON string.
                 return f"Clicked at ({target_x}, {target_y})"
             else:
                 return "Error: CLICK missing bbox"
+
+        elif action_type == "DOUBLE_CLICK":
+            bbox = action_data.get("bbox")
+            if bbox:
+                ymin, xmin, ymax, xmax = bbox
+                center_x_norm = (xmin + xmax) / 2
+                center_y_norm = (ymin + ymax) / 2
+                target_x = int((center_x_norm / 1000) * self.screen_width)
+                target_y = int((center_y_norm / 1000) * self.screen_height)
+                
+                # Visual Debug
+                self.save_debug_artifact(screenshot, bbox, (target_x, target_y))
+                
+                pyautogui.moveTo(target_x, target_y, duration=0.5) 
+                pyautogui.doubleClick()
+                return f"Double-clicked at ({target_x}, {target_y})"
+            else:
+                return "Error: DOUBLE_CLICK missing bbox"
+
+        elif action_type == "RIGHT_CLICK":
+            bbox = action_data.get("bbox")
+            if bbox:
+                ymin, xmin, ymax, xmax = bbox
+                center_x_norm = (xmin + xmax) / 2
+                center_y_norm = (ymin + ymax) / 2
+                target_x = int((center_x_norm / 1000) * self.screen_width)
+                target_y = int((center_y_norm / 1000) * self.screen_height)
+                
+                # Visual Debug
+                self.save_debug_artifact(screenshot, bbox, (target_x, target_y))
+                
+                pyautogui.moveTo(target_x, target_y, duration=0.5) 
+                pyautogui.rightClick()
+                return f"Right-clicked at ({target_x}, {target_y})"
+            else:
+                return "Error: RIGHT_CLICK missing bbox"
 
         elif action_type == "TYPE":
             text = action_data.get("text", "")
