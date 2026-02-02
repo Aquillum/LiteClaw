@@ -18,9 +18,16 @@ try:
     from PIL import Image, ImageDraw
     # Safety: Move mouse to corner to abort
     if pyautogui:
-        pyautogui.FAILSAFE = True
-except ImportError:
-    print("Warning: 'pyautogui' or 'pillow' not found. Vision features will be disabled.")
+        try:
+            pyautogui.FAILSAFE = True
+            # Test if display is actually available
+            pyautogui.size()
+        except Exception as e:
+            print(f"Warning: Vision libraries loaded but Display not available: {e}")
+            pyautogui = None # Disable vision
+except Exception as e:
+    print(f"Warning: Vision features disabled. Initialization error: {e}")
+    pyautogui = None
     pass
 
 try:

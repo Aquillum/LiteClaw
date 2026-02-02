@@ -163,12 +163,23 @@ def check_system_dependencies():
     # 2. Check Python Vision Libraries
     vision_ok = True
     try:
+        # Wrap import in case it tries to connect to display immediately
         import pyautogui
         import PIL
-        console.print("[green]✓ Vision dependencies found (pyautogui, Pillow)[/green]")
+        # Some Linux systems will fail on the first call
+        try:
+             pyautogui.size()
+             console.print("[green]✓ Vision dependencies found and display connected[/green]")
+        except Exception as e:
+             console.print(f"[yellow]⚠ Vision libraries found, but Display Error: {e}[/yellow]")
+             console.print("[dim]Note: This is normal on headless servers or VMs without X11 setup.[/dim]")
+             vision_ok = False
     except ImportError:
-        console.print("[yellow]⚠ Vision dependencies missing. Deskstop automation will be limited.[/yellow]")
+        console.print("[yellow]⚠ Vision dependencies missing. Desktop automation will be limited.[/yellow]")
         console.print("[dim]Run: pip install pyautogui Pillow[/dim]")
+        vision_ok = False
+    except Exception as e:
+        console.print(f"[yellow]⚠ Vision init error: {e}[/yellow]")
         vision_ok = False
         
     return node_ok
