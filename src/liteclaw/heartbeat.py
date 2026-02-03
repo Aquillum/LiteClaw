@@ -94,8 +94,6 @@ class HeartbeatMonitor:
         prompt = f"""
 [HEARTBEAT SYSTEM TRIGGER]
 This is an automated productivity pulse based on user preferences.
-You have access to the 'vision_task' tool to check the screen or specific apps if required.
-
 Please execute the following routine tasks:
 
 {task_list}
