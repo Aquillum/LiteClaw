@@ -53,7 +53,6 @@ class ConsciousMind:
         if not self._agent:
             self._agent = LiteClawAgent()
 
-        focus = self.get_active_focus()
         if "Idle" in focus or "No active conscious focus" in focus:
             print(f"[Conscious] 💤 Idle detected. Initiating Autonomous Job Search...")
             prompt = """
