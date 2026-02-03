@@ -602,9 +602,14 @@ class LiteClawAgent:
                                     else:
                                         caption = "[LiteClaw]"
 
+                                    url_or_path = func_args.get("url_or_path")
+                                    if url_or_path and not url_or_path.startswith('http'):
+                                        if os.path.exists(url_or_path):
+                                            url_or_path = os.path.abspath(url_or_path)
+
                                     media_payload = {
                                         "to": session_id,
-                                        "url_or_path": func_args.get("url_or_path"),
+                                        "url_or_path": url_or_path,
                                         "caption": caption,
                                         "type": media_type,
                                         "platform": platform,

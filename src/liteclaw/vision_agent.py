@@ -43,6 +43,7 @@ class VisionAgent:
         self.max_steps = max_steps
         self.history = []
         self.step_count = 0
+        self.last_screenshot_path = None
         
         # Initialize Client using LiteClaw Settings (Prioritize Vision Config)
         self.model_name = settings.VISION_LLM_MODEL or settings.LLM_MODEL
@@ -76,6 +77,12 @@ class VisionAgent:
             pass
             
         screenshot = pyautogui.screenshot()
+        
+        # Save to file for potential retrieval
+        filename = f"screen_{uuid.uuid4().hex[:8]}.png"
+        self.last_screenshot_path = os.path.abspath(os.path.join(self.screenshot_dir, filename))
+        screenshot.save(self.last_screenshot_path)
+        
         buffered = BytesIO()
         screenshot.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
@@ -397,7 +404,7 @@ Do not return markdown code blocks. Just the raw JSON string.
                     if result_msg == "FINISH":
                         final_reason = action_data.get('reason', 'Done')
                         print(f"[Vision] Finished: {final_reason}")
-                        return f"Task Completed. Reason: {final_reason}\nHistory: {self.history}"
+                        return f"Task Completed. Reason: {final_reason}\nLast Screenshot: {self.last_screenshot_path}\nHistory: {self.history}"
                     
                     # Record History
                     summary = f"Step {self.step_count}: {action_data.get('thought')} -> {action_data.get('action')} => {result_msg}"
