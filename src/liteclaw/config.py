@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     WHATSAPP_TYPE: str = "selenium" # or "cloud_api" or "node_bridge"
     WHATSAPP_ALLOWED_NUMBERS: Optional[list[str]] = None # Pulse numbers allowed to interact
     TELEGRAM_BOT_TOKEN: Optional[str] = None
+    TELEGRAM_ALLOWED_IDS: Optional[list[str]] = None # Pulse usernames or IDs allowed to interact
     GIPHY_API_KEY: Optional[str] = None
     SLACK_BOT_TOKEN: Optional[str] = None
     SLACK_APP_TOKEN: Optional[str] = None
@@ -140,6 +141,8 @@ class JsonConfigSettingsSource(PydanticBaseSettingsSource):
         # Convert comma-separated string to list if it comes from env or JSON is a string
         if isinstance(data.get("WHATSAPP_ALLOWED_NUMBERS"), str):
             data["WHATSAPP_ALLOWED_NUMBERS"] = [n.strip() for n in data["WHATSAPP_ALLOWED_NUMBERS"].split(",") if n.strip()]
+        if isinstance(data.get("TELEGRAM_ALLOWED_IDS"), str):
+            data["TELEGRAM_ALLOWED_IDS"] = [n.strip() for n in data["TELEGRAM_ALLOWED_IDS"].split(",") if n.strip()]
         return data
 
 settings = Settings()
