@@ -46,6 +46,7 @@ class SubconsciousInnovator:
 Your subconscious is currently a blank slate. 
 You have FULL AUTONOMY. Your goal is to learn, fix, and execute improvements without user intervention.
 DO NOT ASK FOR PERMISSION.
+You have access to the 'vision_task' tool to see and control the desktop. Use it to explore the capabilities of the system.
 Identify a system optimization, a code quality fix, or a useful experiment.
 EXECUTE IT NOW.
 Update your SUBCONSCIOUS.md with your findings.
@@ -54,6 +55,7 @@ Update your SUBCONSCIOUS.md with your findings.
             prompt = f"""
 [SUBCONSCIOUS SURFACING - AUTONOMOUS EXECUTION MODE]
 You have FULL AUTONOMY. The user wants you to learn, fix, and execute without asking.
+You have access to the 'vision_task' tool to see and control the desktop. Use it to perform graphical tasks or verifications.
 Based on your internal logs and ideas:
 ---
 {sub_mem}
