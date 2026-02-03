@@ -457,13 +457,6 @@ def setup_bridges(current_config=None):
         
         token = questionary.text("Enter TG Token:", default=current_config.get("TELEGRAM_BOT_TOKEN", "") if current_config else "").ask()
         if token: config["TELEGRAM_BOT_TOKEN"] = token.strip()
-        
-        limit_tg = questionary.confirm("Limit allowed Telegram users?", default=bool(current_config.get("TELEGRAM_ALLOWED_IDS") if current_config else True)).ask()
-        if limit_tg:
-            existing_tg = ",".join(current_config.get("TELEGRAM_ALLOWED_IDS", [])) if current_config else ""
-            console.print("[dim]Enter User IDs or bot:chatid format (comma-sep). Leaving empty allows all.[/dim]")
-            tg_ids = questionary.text("Allowed IDs:", default=existing_tg).ask()
-            if tg_ids: config["TELEGRAM_ALLOWED_IDS"] = [n.strip() for n in tg_ids.split(",") if n.strip()]
 
     if "Slack (requires Bot Token)" in bridges:
         console.print("\n[yellow]💡 Slack Setup Guide:[/yellow]")
@@ -504,28 +497,22 @@ def setup_autonomous_systems():
     
     return True
 
-def pair_bridge(bridge_dir, work_dir, config_data):
-    """Start bridge and wait for WhatsApp QR or Telegram bot to capture IDs."""
-    console.print("\n[bold]📱 Bridge Pairing & Discovery[/bold]")
+def pair_whatsapp(bridge_dir, work_dir, config_data):
+    """Start bridge and wait for WhatsApp QR login during onboarding."""
+    console.print("\n[bold]📱 WhatsApp Pairing[/bold]")
     
-    platforms_to_pair = []
-    if config_data.get("WHATSAPP_TYPE"): platforms_to_pair.append("WhatsApp")
-    if config_data.get("TELEGRAM_BOT_TOKEN"): platforms_to_pair.append("Telegram")
+    qr_mode = questionary.select(
+        "Select QR Display Mode:",
+        choices=[
+            questionary.Choice("Standard (Small blocks, cleaner if terminal supports it)", value="false"),
+            questionary.Choice("Compatible (Large blocks, safer for older terminals)", value="true")
+        ],
+        default="false"
+    ).ask()
     
-    qr_mode = "false"
-    if "WhatsApp" in platforms_to_pair:
-        qr_mode = questionary.select(
-            "Select WhatsApp QR Display Mode:",
-            choices=[
-                questionary.Choice("Standard (Small blocks, cleaner)", value="false"),
-                questionary.Choice("Compatible (Large blocks, safer)", value="true")
-            ],
-            default="false"
-        ).ask()
-    
-    if qr_mode is None: return False, []
+    if qr_mode is None: return False
 
-    console.print(f"[dim]Starting bridge for {', '.join(platforms_to_pair)}...[/dim]")
+    console.print("[dim]Starting bridge to generate QR code...[/dim]")
     
     env = os.environ.copy()
     env["WORK_DIR"] = work_dir
@@ -538,10 +525,183 @@ def pair_bridge(bridge_dir, work_dir, config_data):
             env["PYTHONIOENCODING"] = "utf-8"
         except: pass
 
-    if config_data.get("TELEGRAM_BOT_TOKEN"): env["TELEGRAM_BOT_TOKEN"] = config_data["TELEGRAM_BOT_TOKEN"]
-    if config_data.get("TELEGRAM_BOT_TOKENS"): env["TELEGRAM_BOT_TOKENS"] = config_data["TELEGRAM_BOT_TOKENS"]
-    if config_data.get("SLACK_BOT_TOKEN"): env["SLACK_BOT_TOKEN"] = config_data["SLACK_BOT_TOKEN"]
+    if config_data.get("TELEGRAM_BOT_TOKEN"):
+        env["TELEGRAM_BOT_TOKEN"] = config_data["TELEGRAM_BOT_TOKEN"]
+    if config_data.get("SLACK_BOT_TOKEN"):
+        env["SLACK_BOT_TOKEN"] = config_data["SLACK_BOT_TOKEN"]
+    if config_data.get("SLACK_APP_TOKEN"):
+        env["SLACK_APP_TOKEN"] = config_data["SLACK_APP_TOKEN"]
+    if config_data.get("SLACK_SIGNING_SECRET"):
+        env["SLACK_SIGNING_SECRET"] = config_data["SLACK_SIGNING_SECRET"]
     
+    try:
+        process = subprocess.Popen(
+            ["node", "index.js"],
+            cwd=bridge_dir,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8", # Explicitly use utf-8 for reading
+            bufsize=1,
+        )
+        
+        console.print("[yellow]Waiting for QR code... (this may take 10-20s)[/yellow]")
+        console.print("[dim]If the QR is still broken, look for 'qr.html' in your work directory.[/dim]")
+        
+        authenticated = False
+        discovered_ids = []
+        pin_code = None  # Initialize PIN code variable
+        
+        while True:
+            line = process.stdout.readline()
+            if not line: break
+            
+            # Use RICH to print line, handles UTF8 better
+            console.print(line, end="")
+            
+            if "[Bridge] Live QR updated:" in line or "[Bridge] Fallback QR saved to:" in line:
+                html_path = os.path.join(work_dir, "qr.html")
+                if os.path.exists(html_path):
+                    console.print(f"[bold cyan]🔗 Opening QR Code in browser...[/bold cyan]")
+                    webbrowser.open(f"file:///{html_path}")
+
+            if "WhatsApp Client is ready!" in line or "Authenticated successfully!" in line:
+                authenticated = True
+                console.print("\n[bold green]✅ WhatsApp Paired Successfully![/bold green]")
+                
+                # Generate unique PIN for ID discovery (only once)
+                import random
+                pin_code = f"{random.randint(100000, 999999)}"
+                
+                # Discovery Mode with PIN
+                console.print("\n[bold yellow]🔍 ID Discovery Mode[/bold yellow]")
+                console.print(f"[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                console.print(f"[bold white]Your Verification PIN: [bold green]{pin_code}[/bold green][/bold white]")
+                console.print(f"[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                console.print("\n[yellow]📱 Steps to capture your WhatsApp ID:[/yellow]")
+                console.print(f"  1. Open WhatsApp on your phone")
+                console.print(f"  2. Send this PIN to LiteClaw: [bold green]{pin_code}[/bold green]")
+                console.print(f"  3. Your ID will be automatically captured!\n")
+                console.print("[dim]⏳ Waiting for PIN verification... (Press Ctrl+C to skip)[/dim]\n")
+                # Don't break, continue loop to catch messages
+                
+            # Check for incoming messages from others
+            if "[Incoming] From" in line and pin_code:  # Only check if PIN was generated
+                console.print(f"[dim]DEBUG: Found incoming message, PIN is: {pin_code}[/dim]")
+                # Format: [Incoming] From Name (ID): Body
+                import re
+                match = re.search(r"\(([^)]+)\):\s*(.+)", line)
+                if match:
+                    found_id = match.group(1)
+                    message_body = match.group(2).strip()
+                    console.print(f"[dim]DEBUG: Extracted ID={found_id}, Body='{message_body}'[/dim]")
+                    
+                    # Check if message contains the PIN
+                    if pin_code in message_body:
+                        if found_id not in discovered_ids:
+                            discovered_ids.append(found_id)
+                            console.print(f"\n[bold green]✅ PIN VERIFIED![/bold green]")
+                            console.print(f"[bold green]🎯 ID Captured: {found_id}[/bold green]")
+                            
+                            if questionary.confirm(f"Add '{found_id}' to authorized numbers?", default=True).ask():
+                                console.print(f"[green]✓ Added {found_id} to authorized list.[/green]")
+                            else:
+                                discovered_ids.remove(found_id)
+                                console.print(f"[yellow]○ Skipped {found_id}[/yellow]")
+                            
+                            if not questionary.confirm("Capture another ID? (New PIN will be generated)", default=False).ask():
+                                break
+                            else:
+                                # Generate new PIN for next capture
+                                pin_code = f"{random.randint(100000, 999999)}"
+                                console.print(f"\n[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                                console.print(f"[bold white]New Verification PIN: [bold green]{pin_code}[/bold green][/bold white]")
+                                console.print(f"[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                                console.print(f"\n[yellow]Send this PIN from another device: [bold green]{pin_code}[/bold green][/yellow]\n")
+                    else:
+                        console.print(f"[red]❌ Wrong PIN received from {found_id}: '{message_body}'[/red]")
+                        console.print(f"[yellow]💡 Expected PIN: {pin_code}[/yellow]\n")
+                else:
+                    console.print(f"[dim]DEBUG: Regex didn't match for line: {line}[/dim]")
+            
+            # Check for self-sent messages (to capture your own ID)
+            if "[Self] Sent to" in line and pin_code:
+                console.print(f"[dim]DEBUG: Found self-sent message, PIN is: {pin_code}[/dim]")
+                # Format: [Self] Sent to ID: Body
+                import re
+                match = re.search(r"Sent to ([^:]+):\s*(.+)", line)
+                if match:
+                    recipient_id = match.group(1).strip()
+                    message_body = match.group(2).strip()
+                    console.print(f"[dim]DEBUG: Self-sent to ID={recipient_id}, Body='{message_body}'[/dim]")
+                    
+                    # Check if message contains the PIN (user sending PIN to themselves)
+                    if pin_code in message_body:
+                        if recipient_id not in discovered_ids:
+                            discovered_ids.append(recipient_id)
+                            console.print(f"\n[bold green]✅ PIN VERIFIED (Self-Capture)![/bold green]")
+                            console.print(f"[bold green]🎯 ID Captured: {recipient_id}[/bold green]")
+                            
+                            if questionary.confirm(f"Add '{recipient_id}' to authorized numbers?", default=True).ask():
+                                console.print(f"[green]✓ Added {recipient_id} to authorized list.[/green]")
+                            else:
+                                discovered_ids.remove(recipient_id)
+                                console.print(f"[yellow]○ Skipped {recipient_id}[/yellow]")
+                            
+                            if not questionary.confirm("Capture another ID? (New PIN will be generated)", default=False).ask():
+                                break
+                            else:
+                                # Generate new PIN for next capture
+                                pin_code = f"{random.randint(100000, 999999)}"
+                                console.print(f"\n[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                                console.print(f"[bold white]New Verification PIN: [bold green]{pin_code}[/bold green][/bold white]")
+                                console.print(f"[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                                console.print(f"\n[yellow]Send this PIN from another device: [bold green]{pin_code}[/bold green][/yellow]\n")
+                else:
+                    console.print(f"[dim]DEBUG: Self-sent regex didn't match for line: {line}[/dim]")
+
+            if process.poll() is not None: break
+                
+        time.sleep(1)
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            
+        return authenticated, discovered_ids
+        
+    except Exception as e:
+        console.print(f"[red]Error during WhatsApp pairing: {e}[/red]")
+        return False
+
+def pair_telegram(bridge_dir, work_dir, config_data):
+    """Start bridge and wait for Telegram User ID capture via PIN."""
+    console.print("\n[bold]✈️ Telegram Pairing[/bold]")
+    
+    # Check if token exists
+    if not config_data.get("TELEGRAM_BOT_TOKEN"):
+        console.print("[red]No Telegram Bot Token found. Skipping.[/red]")
+        return False, []
+
+    env = os.environ.copy()
+    env["WORK_DIR"] = work_dir
+    
+    # Force UTF-8 for Windows consoles
+    if platform.system() == "Windows":
+        try:
+            subprocess.run(["chcp", "65001"], capture_output=True, shell=(os.name == 'nt'))
+            env["PYTHONIOENCODING"] = "utf-8"
+        except: pass
+
+    # Pass tokens
+    if config_data.get("TELEGRAM_BOT_TOKEN"):
+        env["TELEGRAM_BOT_TOKEN"] = config_data["TELEGRAM_BOT_TOKEN"]
+    # Pass other tokens just in case bridge verifies them, though only specific one is critical
+    if config_data.get("SLACK_BOT_TOKEN"):
+        env["SLACK_BOT_TOKEN"] = config_data["SLACK_BOT_TOKEN"]
+
     try:
         process = subprocess.Popen(
             ["node", "index.js"],
@@ -554,66 +714,87 @@ def pair_bridge(bridge_dir, work_dir, config_data):
             bufsize=1,
         )
         
-        authenticated = False
+        console.print("[yellow]Starting Telegram Bot...[/yellow]")
+        
+        bot_ready = False
+        bot_username = "unknown_bot"
         discovered_ids = []
-        pin_code = None
+        import random
+        pin_code = f"{random.randint(100000, 999999)}"
+        
+        console.print("\n[bold yellow]🔍 Telegram ID Discovery Mode[/bold yellow]")
+        console.print("[dim]Wait for the bot to start...[/dim]")
+
+        import re
         
         while True:
             line = process.stdout.readline()
             if not line: break
-            console.print(line, end="")
             
-            if "[Bridge] Live QR updated:" in line:
-                html_path = os.path.join(work_dir, "qr.html")
-                if os.path.exists(html_path):
-                    webbrowser.open(f"file:///{html_path}")
+            # console.print(line, end="") # Debug print everything? Maybe too noisy. Just status.
+            
+            if "[Telegram] ✅ Bot started:" in line:
+                bot_ready = True
+                # Extract username: [Telegram] ✅ Bot started: @username
+                m = re.search(r"@(\w+)", line)
+                if m: bot_username = m.group(1)
+                
+                console.print(f"[green]✓ Bot @{bot_username} is online![/green]")
+                console.print(f"[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                console.print(f"[bold white]Your Verification PIN: [bold green]{pin_code}[/bold green][/bold white]")
+                console.print(f"[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                console.print("\n[yellow]📱 Steps to capture your Telegram ID:[/yellow]")
+                console.print(f"  1. Open Telegram and search for [bold]@ {bot_username}[/bold]")
+                console.print(f"  2. Click Start (if new) and send this PIN: [bold green]{pin_code}[/bold green]")
+                console.print(f"  3. Your Chat ID will be automatically captured!\n")
+                console.print("[dim]⏳ Waiting for PIN verification... (Press Ctrl+C to skip)[/dim]\n")
 
-            # Platform Readiness Checks
-            is_wa_ready = "WhatsApp Client is ready!" in line or "Authenticated successfully!" in line
-            is_tg_ready = "Bot started: @" in line
-            
-            if is_wa_ready or is_tg_ready:
-                if is_wa_ready: console.print("\n[bold green]✅ WhatsApp Ready![/bold green]")
-                if is_tg_ready: console.print(f"\n[bold green]✅ Telegram Bot Ready![/bold green]")
-                
-                authenticated = True
-                if not pin_code:
-                    import random
-                    pin_code = f"{random.randint(100000, 999999)}"
-                    console.print("\n[bold yellow]🔍 ID Discovery Mode[/bold yellow]")
-                    console.print(f"[bold white]Verification PIN: [bold green]{pin_code}[/bold green][/bold white]")
-                    console.print(f"\n[yellow]Steps to capture your ID:[/yellow]")
-                    console.print(f"1. Open WhatsApp or Telegram")
-                    console.print(f"2. Send this PIN to LiteClaw: [bold green]{pin_code}[/bold green]")
-                    console.print("\n[dim]⏳ Waiting for PIN... (Press Ctrl+C to skip)[/dim]\n")
-                
-            # PIN Verification Logic (Shared)
-            import re
-            # Check for generic format: [Incoming] From Name (ID): Body
-            match = re.search(r"From (.+?) \((.+?)\):\s*(.+)", line)
-            if match and pin_code:
-                sender_name = match.group(1).strip()
-                found_id = match.group(2).strip()
-                message_body = match.group(3).strip()
-                
-                if pin_code in message_body:
-                    if found_id not in discovered_ids:
-                        discovered_ids.append(found_id)
-                        console.print(f"\n[bold green]✅ PIN VERIFIED for {sender_name}![/bold green]")
-                        console.print(f"[bold green]🎯 ID Captured: {found_id}[/bold green]")
-                        
-                        if not questionary.confirm("Capture another ID?", default=False).ask():
-                            break
-                        else:
-                            pin_code = f"{random.randint(100000, 999999)}"
-                            console.print(f"\n[bold white]Next PIN: [bold green]{pin_code}[/bold green][/bold white]")
+            # Listen for incoming messages
+            # Log format: [Telegram:@username] Incoming from chatid: message
+            if "[Telegram:@" in line and pin_code:
+                # Regex match
+                # [Telegram:@BotName] Incoming from 123456789: 123456
+                match = re.search(r"\[Telegram:@([^\]]+)\] Incoming from ([^:]+):\s*(.+)", line)
+                if match:
+                    found_bot = match.group(1)
+                    found_id = match.group(2).strip()
+                    message_body = match.group(3).strip()
+                    
+                    if pin_code in message_body:
+                        if found_id not in discovered_ids:
+                            discovered_ids.append(found_id)
+                            console.print(f"\n[bold green]✅ PIN VERIFIED![/bold green]")
+                            console.print(f"[bold green]🎯 Chat ID Captured: {found_id}[/bold green]")
+                            
+                            if questionary.confirm(f"Add '{found_id}' to authorized Telegram users?", default=True).ask():
+                                console.print(f"[green]✓ Added {found_id} to authorized list.[/green]")
+                            else:
+                                discovered_ids.remove(found_id)
+                                console.print(f"[yellow]○ Skipped {found_id}[/yellow]")
+                            
+                            if not questionary.confirm("Capture another ID? (New PIN will be generated)", default=False).ask():
+                                break
+                            else:
+                                pin_code = f"{random.randint(100000, 999999)}"
+                                console.print(f"\n[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+                                console.print(f"[bold white]New Verification PIN: [bold green]{pin_code}[/bold green][/bold white]")
+                                console.print(f"\n[yellow]Send this PIN from another account: [bold green]{pin_code}[/bold green][/yellow]\n")
+                    else:
+                        console.print(f"[dim]Ignored non-PIN message from {found_id}[/dim]")
 
             if process.poll() is not None: break
-                
+            time.sleep(0.1)
+
         process.terminate()
-        return authenticated, discovered_ids
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            
+        return True, discovered_ids
+
     except Exception as e:
-        console.print(f"[red]Error during pairing: {e}[/red]")
+        console.print(f"[red]Error during Telegram pairing: {e}[/red]")
         return False, []
 
 def save_config(config_data):
@@ -681,36 +862,44 @@ def onboarding():
         save_config(config_data)
         migrate_files(work_dir)
         
-        platforms_to_pair = []
-        if config_data.get("WHATSAPP_TYPE"): platforms_to_pair.append("WhatsApp")
-        if config_data.get("TELEGRAM_BOT_TOKEN"): platforms_to_pair.append("Telegram")
-        
         bridge_dir = os.path.join(os.path.dirname(__file__), "bridge")
         if not os.path.exists(bridge_dir): bridge_dir = os.path.join(os.getcwd(), "src", "liteclaw", "bridge")
         
-        if platforms_to_pair:
+        if "WhatsApp (requires phone scan)" in bridge_config.get("WHATSAPP_TYPE", "") or config_data.get("WHATSAPP_TYPE"):
             if os.path.exists(bridge_dir) and not os.path.exists(os.path.join(bridge_dir, "node_modules")):
                 console.print("[blue]Pre-installing Bridge Dependencies...[/blue]")
                 subprocess.check_call(["npm", "install"], cwd=bridge_dir, shell=(os.name == 'nt'))
             
-            if questionary.confirm(f"\nPair {', '.join(platforms_to_pair)} now?", default=True).ask():
-                auth_ok, discovered_ids = pair_bridge(bridge_dir, work_dir, config_data)
+            if questionary.confirm("\nPair WhatsApp via QR now?", default=True).ask():
+                auth_ok, discovered_ids = pair_whatsapp(bridge_dir, work_dir, config_data)
                 if auth_ok and discovered_ids:
                     # Merge discovered IDs into config
-                    wa_allowed = config_data.get("WHATSAPP_ALLOWED_NUMBERS", [])
-                    tg_allowed = config_data.get("TELEGRAM_ALLOWED_IDS", [])
-                    
+                    allowed = config_data.get("WHATSAPP_ALLOWED_NUMBERS", [])
                     for d_id in discovered_ids:
-                        if ":" in d_id: # Telegram ID format "username:chatId"
-                            if d_id not in tg_allowed: tg_allowed.append(d_id)
-                        else: # WhatsApp ID format
-                            if d_id not in wa_allowed: wa_allowed.append(d_id)
-                    
-                    config_data["WHATSAPP_ALLOWED_NUMBERS"] = wa_allowed
-                    config_data["TELEGRAM_ALLOWED_IDS"] = tg_allowed
+                        if d_id not in allowed:
+                            allowed.append(d_id)
+                    config_data["WHATSAPP_ALLOWED_NUMBERS"] = allowed
                     
                     # Save updated config
                     save_config(config_data)
+
+        if "Telegram (requires Bot Token)" in bridge_config.get("TELEGRAM_BOT_TOKEN", "TG") or config_data.get("TELEGRAM_BOT_TOKEN"):
+             # Logic to trigger TG pairing if token exists and user confirms
+             if config_data.get("TELEGRAM_BOT_TOKEN"):
+                 if questionary.confirm("\nPair Telegram User IDs now?", default=True).ask():
+                     # Install deps if not present (re-using logic from WA check, arguably explicit check better)
+                     if os.path.exists(bridge_dir) and not os.path.exists(os.path.join(bridge_dir, "node_modules")):
+                         console.print("[blue]Pre-installing Bridge Dependencies...[/blue]")
+                         subprocess.check_call(["npm", "install"], cwd=bridge_dir, shell=(os.name == 'nt'))
+
+                     tg_auth_ok, tg_ids = pair_telegram(bridge_dir, work_dir, config_data)
+                     if tg_auth_ok and tg_ids:
+                         allowed_tg = config_data.get("TELEGRAM_ALLOWED_IDS", [])
+                         for tid in tg_ids:
+                             if tid not in allowed_tg:
+                                 allowed_tg.append(tid)
+                         config_data["TELEGRAM_ALLOWED_IDS"] = allowed_tg
+                         save_config(config_data)
 
         console.print("\n[bold white]🚀 Ready! Run: liteclaw run[/bold white]")
 
