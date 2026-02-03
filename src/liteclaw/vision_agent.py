@@ -104,7 +104,8 @@ You must output a JSON object describing the next action to take.
 5. **HOTKEY**: Press a key combination.
    - Required fields: "keys" (list of strings, e.g. ["ctrl", "c"], ["enter"], ["win"])
 6. **SCROLL**: Scroll the mouse wheel.
-   - Required fields: "direction" ("up" | "down"), "amount" (integer, e.g. 3 clicks)
+   - Required fields: "direction" ("up" | "down"), "amount" (integer).
+   - Tip: Use amount=1 or 2 for precise reading (bit-by-bit). Use 5+ for fast navigation.
 7. **MOVE_TO**: Move the mouse without clicking.
    - Required fields: "point" ([x, y] normalized 0-1000)
 8. **WAIT**: Wait for a few seconds.
@@ -217,11 +218,15 @@ Do not return markdown code blocks. Just the raw JSON string.
         elif action_type == "SCROLL":
             direction = action_data.get("direction", "down")
             amount = action_data.get("amount", 3)
-            # PyAutoGUI scroll amount varies by OS, but usually 120 is one 'click' on Windows
-            # User requirement: "1 scroll is equal to the scroll we do in mouse"
-            scroll_val = -amount if direction == "down" else amount
-            pyautogui.scroll(scroll_val * 120) 
-            return f"Scrolled {direction} by {amount} clicks"
+            # Smooth scroll implementation to prevent "hard" jumps
+            # Scrolls bit-by-bit (1 click = 120 units) with delays
+            clicks = amount
+            for _ in range(clicks):
+                scroll_cmd = -120 if direction == "down" else 120
+                pyautogui.scroll(scroll_cmd)
+                time.sleep(0.1) # Small delay for smooth visual and app response
+            
+            return f"Scrolled {direction} by {clicks} clicks (bit-by-bit)"
 
         elif action_type == "MOVE_TO":
             point = action_data.get("point")
