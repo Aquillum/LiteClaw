@@ -457,7 +457,7 @@ def setup_autonomous_systems():
     
     console.print("[bold cyan]💓 Heartbeat Monitor[/bold cyan]")
     console.print("  - Periodically executes routine tasks defined in HEARTBEAT.md.")
-    console.print("  - Default: Every 1 hour.")
+    console.print("  - Default: Every 4 mins (Customizable via AI or config).")
     
     console.print("\n[bold cyan]🧠 Subconscious Innovator[/bold cyan]")
     console.print("  - Surfaces random technical insights and experimental tasks.")

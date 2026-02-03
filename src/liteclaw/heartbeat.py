@@ -7,7 +7,7 @@ from typing import List, Dict, Any
 from .agent import LiteClawAgent
 from .config import settings
 
-HEARTBEAT_FILE = os.path.join(os.path.dirname(__file__), "HEARTBEAT.md")
+HEARTBEAT_FILE = os.path.join(settings.get_configs_dir(), "HEARTBEAT.md")
 HEARTBEAT_SESSION_ID = "soul-heartbeat-monitor"
 
 class HeartbeatMonitor:
@@ -17,7 +17,7 @@ class HeartbeatMonitor:
         self._agent = LiteClawAgent()
         self._last_run = 0
         self._config = {
-            "interval_seconds": 3600,
+            "interval_seconds": 240,
             "enabled": False
         }
         self._tasks = []
