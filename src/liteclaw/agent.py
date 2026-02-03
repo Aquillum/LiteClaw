@@ -289,12 +289,12 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "update_conscious",
-            "description": "Update your current active intent, short-term focus, or immediate goal. Max duration: 20 mins. Use this at the start of complex tasks.",
+            "description": "Update your current active intent, short-term focus, or immediate goal. Max duration: 10 mins. Use this for high-precision, immediate tasks.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "focus_intent": {"type": "string", "description": "Description of what you are currently intending to work on."},
-                    "duration_minutes": {"type": "integer", "default": 20, "description": "How long to keep this focus active (max 20)."}
+                    "duration_minutes": {"type": "integer", "default": 10, "description": "How long to keep this focus active (max 10)."}
                 },
                 "required": ["focus_intent"]
             }
