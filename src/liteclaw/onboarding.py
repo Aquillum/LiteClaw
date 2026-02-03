@@ -463,11 +463,7 @@ def setup_autonomous_systems():
     console.print("  - Surfaces random technical insights and experimental tasks.")
     console.print("  - Learns from environment even when you aren't chatting.")
     
-    console.print("\n[bold cyan]💡 Conscious Mind[/bold cyan]")
-    console.print("  - Tracks short-term active intents and immediate goals (20-min span).")
-    console.print("  - Helps you stay focused during multi-step tasks.")
-    
-    console.print("\n[yellow]Note: You can configure these later by editing HEARTBEAT.md, SUBCONSCIOUS.md, and CONSCIOUS.md in your work directory.[/yellow]")
+    console.print("\n[yellow]Note: You can configure these later by editing HEARTBEAT.md and SUBCONSCIOUS.md in your work directory.[/yellow]")
     
     return True
 
@@ -661,7 +657,7 @@ def save_config(config_data):
 
 def migrate_files(work_dir):
     configs_dir = os.path.join(work_dir, "configs")
-    core_files = ["AGENT.md", "SOUL.md", "PERSONALITY.md", "SUBCONSCIOUS.md", "HEARTBEAT.md", "CONSCIOUS.md"]
+    core_files = ["AGENT.md", "SOUL.md", "PERSONALITY.md", "SUBCONSCIOUS.md", "HEARTBEAT.md"]
     md_files = [f for f in os.listdir(".") if f.endswith(".md")]
     pkg_dir = os.path.dirname(__file__)
     to_copy = []
