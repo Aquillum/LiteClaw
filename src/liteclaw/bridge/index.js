@@ -200,8 +200,9 @@ app.post('/whatsapp/typing', async (req, res) => {
 
     try {
         if (platform === 'telegram') {
-            if (global.telegramBot) {
-                await global.telegramBot.sendChatAction(to, 'typing');
+            const { bot, chatId } = resolveTelegramTarget(to);
+            if (bot) {
+                await bot.sendChatAction(chatId, 'typing');
                 return res.json({ success: true, platform: 'telegram' });
             }
             return res.status(400).json({ error: "Telegram bot not initialized" });
@@ -263,7 +264,8 @@ app.post('/whatsapp/send', async (req, res) => {
 
     try {
         if (platform === 'telegram') {
-            if (!global.telegramBot) throw new Error("Telegram bot not initialized");
+            const { bot, chatId } = resolveTelegramTarget(to);
+            if (!bot) throw new Error("Telegram bot not initialized");
 
             if (is_media) {
                 // For local files, we must use fs.createReadStream to ensure reliable delivery
@@ -273,19 +275,19 @@ app.post('/whatsapp/send', async (req, res) => {
                 }
 
                 if (type === 'image') {
-                    await global.telegramBot.sendPhoto(to, mediaSource, { caption: caption });
+                    await bot.sendPhoto(chatId, mediaSource, { caption: caption });
                 } else if (type === 'gif') {
                     // GIFs are best sent as animations in Telegram
-                    await global.telegramBot.sendAnimation(to, mediaSource, { caption: caption });
+                    await bot.sendAnimation(chatId, mediaSource, { caption: caption });
                 } else if (type === 'video') {
-                    await global.telegramBot.sendVideo(to, mediaSource, { caption: caption });
+                    await bot.sendVideo(chatId, mediaSource, { caption: caption });
                 } else if (type === 'audio') {
-                    await global.telegramBot.sendAudio(to, mediaSource, { caption: caption });
+                    await bot.sendAudio(chatId, mediaSource, { caption: caption });
                 } else {
-                    await global.telegramBot.sendDocument(to, mediaSource, { caption: caption });
+                    await bot.sendDocument(chatId, mediaSource, { caption: caption });
                 }
             } else {
-                await global.telegramBot.sendMessage(to, message);
+                await bot.sendMessage(chatId, message);
             }
             return res.json({ success: true, platform: 'telegram' });
         }
@@ -366,68 +368,113 @@ app.post('/whatsapp/send', async (req, res) => {
     }
 });
 
-// --- Telegram Polling (Zero-Setup) ---
-// Note: TELEGRAM_TOKEN and SLACK_BOT_TOKEN are already loaded during bridge startup
+// --- Telegram Polling (Unified Multi-Bot Support) ---
 
-if (TELEGRAM_TOKEN) {
-    console.log("Starting Telegram Bot (Polling Mode)...");
+let telegramTokens = [];
+if (process.env.TELEGRAM_BOT_TOKEN) telegramTokens.push(process.env.TELEGRAM_BOT_TOKEN);
+if (process.env.TELEGRAM_BOT_TOKENS) {
+    const extraTokens = process.env.TELEGRAM_BOT_TOKENS.split(',').map(t => t.trim()).filter(t => t);
+    telegramTokens = [...telegramTokens, ...extraTokens];
+}
+// Remove duplicates
+telegramTokens = [...new Set(telegramTokens)];
+
+global.telegramBots = new Map(); // username -> bot instance
+global.defaultTelegramBot = null; // fallback
+
+if (telegramTokens.length > 0) {
+    console.log(`[Telegram] Found ${telegramTokens.length} bot token(s). Initializing...`);
     const TelegramBot = require('node-telegram-bot-api');
 
-    // Configure polling with error handling options
-    const bot = new TelegramBot(TELEGRAM_TOKEN, {
-        polling: {
-            interval: 300,
-            autoStart: true,
-            params: {
-                timeout: 10
-            }
+    telegramTokens.forEach(token => {
+        try {
+            const bot = new TelegramBot(token, {
+                polling: {
+                    interval: 300,
+                    autoStart: true,
+                    params: { timeout: 10 }
+                }
+            });
+
+            // Get bot info to identify it
+            bot.getMe().then(me => {
+                const username = me.username;
+                console.log(`[Telegram] ✅ Bot started: @${username}`);
+                global.telegramBots.set(username, bot);
+
+                // Set first one as default
+                if (!global.defaultTelegramBot) global.defaultTelegramBot = bot;
+
+                setupTelegramListeners(bot, username);
+            }).catch(err => {
+                console.error(`[Telegram] Failed to init bot with token ending ...${token.slice(-5)}: ${err.message}`);
+            });
+
+        } catch (e) {
+            console.error(`[Telegram] Setup error: ${e.message}`);
         }
     });
+} else {
+    console.log("No TELEGRAM_BOT_TOKEN(s) found in env. Skipping Telegram.");
+}
 
-    // Handle polling errors gracefully (ECONNRESET, network issues)
+function setupTelegramListeners(bot, botUsername) {
+    // Handle polling errors gracefully
     bot.on('polling_error', (error) => {
-        // Only log non-fatal errors to avoid spam
-        if (error.code === 'EFATAL') {
-            console.log('[Telegram] Polling connection reset, will auto-reconnect...');
-        } else {
-            console.error('[Telegram] Polling error:', error.code, error.message);
+        if (error.code !== 'EFATAL') {
+            // console.error(`[Telegram:@${botUsername}] Polling error: ${error.code}`);
         }
-    });
-
-    bot.on('error', (error) => {
-        console.error('[Telegram] Bot error:', error.message);
     });
 
     bot.on('message', async (msg) => {
-        // Only ignore if no text
         if (!msg.text) return;
+
+        // Structure session ID as "botUsername:chatId" to isolate sessions
+        // We use the first one as default/legacy if needed, but for multi-bot 
+        // strictly prefer the prefixed version to avoid collision.
+        const sessionKey = `${botUsername}:${msg.chat.id}`;
 
         const payload = {
             platform: 'telegram',
             message_id: msg.message_id.toString(),
-            from: msg.chat.id.toString(), // Chat ID as session key
+            from: sessionKey,
             body: msg.text,
             timestamp: msg.date,
             senderName: msg.from.first_name || "Telegram User",
             fromMe: false
         };
 
-        console.log(`[Telegram] Incoming: ${msg.text}`);
+        console.log(`[Telegram:@${botUsername}] Incoming from ${msg.chat.id}: ${msg.text}`);
 
-        // Forward to Python
         try {
             await axios.post(PYTHON_BACKEND_URL, payload);
         } catch (error) {
-            console.error('[Telegram] Forward Error:', error.message);
+            console.error(`[Telegram] Forward Error: ${error.message}`);
         }
     });
-
-    // Store globally for reply handler
-    global.telegramBot = bot;
-
-} else {
-    console.log("No TELEGRAM_BOT_TOKEN found in env. Skipping Telegram.");
 }
+
+// Helper to resolve bot and chat ID from "username:chatId" string
+function resolveTelegramTarget(to) {
+    if (to.includes(':')) {
+        const parts = to.split(':');
+        // Check if the first part is a known bot username
+        // Part 0 might be username, Part 1 might be chat ID
+        // Caution: Colon is rare in normal chat IDs but standard in our new format
+        const username = parts[0];
+        const chatId = parts.slice(1).join(':'); // Re-join rest in case of weirdness
+
+        if (global.telegramBots.has(username)) {
+            return { bot: global.telegramBots.get(username), chatId: chatId };
+        }
+    }
+
+    // Fallback: If no prefix or unknown prefix, use default bot
+    // This maintains backward compatibility if 'to' is just a number
+    return { bot: global.defaultTelegramBot, chatId: to };
+}
+
+
 
 // --- Slack Socket Mode (Bolt.js) ---
 if (SLACK_BOT_TOKEN && SLACK_APP_TOKEN) {
