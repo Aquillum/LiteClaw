@@ -267,20 +267,8 @@ app.post('/whatsapp/send', async (req, res) => {
 
             if (is_media) {
                 let mediaSource = url_or_path;
-                let fullPath = url_or_path;
-
-                // Support relative paths by checking WORK_DIR
-                if (!path.isAbsolute(fullPath) && !fullPath.startsWith('http')) {
-                    const potentialPath = path.join(WORK_DIR, url_or_path);
-                    if (fs.existsSync(potentialPath)) {
-                        fullPath = potentialPath;
-                    }
-                }
-
-                if (fs.existsSync(fullPath)) {
-                    mediaSource = fs.createReadStream(fullPath);
-                } else if (!fullPath.startsWith('http')) {
-                    throw new Error(`Media file not found: ${fullPath} (In WORK_DIR: ${WORK_DIR})`);
+                if (fs.existsSync(url_or_path)) {
+                    mediaSource = fs.createReadStream(url_or_path);
                 }
 
                 if (type === 'image') {
@@ -346,18 +334,10 @@ app.post('/whatsapp/send', async (req, res) => {
 
             if (is_media) {
                 let media;
-                let fullPath = url_or_path;
-                if (!path.isAbsolute(fullPath) && !fullPath.startsWith('http')) {
-                    const potentialPath = path.join(WORK_DIR, url_or_path);
-                    if (fs.existsSync(potentialPath)) {
-                        fullPath = potentialPath;
-                    }
-                }
-
-                if (fullPath.startsWith('http')) {
-                    media = await MessageMedia.fromUrl(fullPath);
+                if (url_or_path.startsWith('http')) {
+                    media = await MessageMedia.fromUrl(url_or_path);
                 } else {
-                    media = MessageMedia.fromFilePath(fullPath);
+                    media = MessageMedia.fromFilePath(url_or_path);
                 }
                 const response = await client.sendMessage(to, media, { caption: caption });
                 return res.json({ success: true, id: response.id._serialized, platform: 'whatsapp' });
