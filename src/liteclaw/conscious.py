@@ -8,11 +8,11 @@ CONSCIOUS_SESSION_ID = "conscious-worker"
 class ConsciousMind:
     """
     Manages the 'Conscious Memory' of LiteClaw.
-    Span: 10 minutes (Employee Mode).
-    Focus: High precision. Immediate tasks. Low time span.
-    This system proactively works on the 'Active Focus' in rapid, high-focus background cycles.
+    Span: 15 minutes.
+    Focus: Active intents and immediate goals.
+    This system proactively works on the 'Active Focus' in background cycles.
     """
-    MAX_EXPIRY = 10
+    MAX_EXPIRY = 15
 
     def __init__(self):
         self.last_sync = datetime.now()
@@ -27,19 +27,21 @@ class ConsciousMind:
         import threading
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
-        print("[Conscious] 🧠 Employee System started.")
+        print("[Conscious] 🧠 Worker system started.")
 
     def _loop(self):
         import time
         import random
-        # Initial sleep to stagger
-        time.sleep(30)
+        # Initial sleep to stagger with subconscious
+        time.sleep(45)
         
         while self._running:
-            # High precision mode: Work happens every 2 to 5 minutes
-            wait_time = random.randint(120, 300) 
+            # Conscious action happens every 5 to 15 minutes when there's an active focus
+            wait_time = random.randint(300, 900) 
             
-            print(f"[Conscious] Next high-precision task scheduled in {wait_time//60} mins {wait_time%60} secs.")
+            # We check focus frequently to avoid sleeping through a new intent,
+            # but for simplicity in this background worker, we'll follow the requested 5-15 min cadence.
+            print(f"[Conscious] Next working cycle scheduled in {wait_time//60} mins {wait_time%60} secs.")
             time.sleep(wait_time)
             
             if not self._running:
@@ -51,6 +53,7 @@ class ConsciousMind:
         """Invoke the agent to progress the active conscious focus."""
         focus = self.get_active_focus()
         if "Idle" in focus or "No active conscious focus" in focus:
+            # print("[Conscious] Idle. No work to perform.")
             return
             
         # Avoid circular imports
@@ -59,17 +62,14 @@ class ConsciousMind:
             self._agent = LiteClawAgent()
 
         prompt = f"""
-[CONSCIOUS WORKER - EMPLOYEE MODE]
-You are currently in specific, high-precision "Employee Mode".
-Your time span is short (max 10 mins). You must be efficient and precise.
-
-CURRENT ACTIVE FOCUS:
+[CONSCIOUS WORKER - ACTIVE FOCUS]
+You are currently focused on this task:
 ---
 {focus}
 ---
-Perform the next IMMEDIATE, PRECISE step to forward this specific goal.
-Do not hallucinate scope. Stick to the immediate task.
-If the task is complete, use the 'update_conscious' tool to set your focus to Idle.
+Perform the next logical step to achieve this goal. 
+If the task is complete, use the 'update_conscious' tool to set your focus to Idle and explain why.
+If you need more information, or if you are stuck, state so.
 """
         
         try:
@@ -116,7 +116,7 @@ If the task is complete, use the 'update_conscious' tool to set your focus to Id
                 
         return content
 
-    def set_active_focus(self, focus_intent: str, duration_minutes: int = 10):
+    def set_active_focus(self, focus_intent: str, duration_minutes: int = 15):
         """Sets a new conscious focus with a current timestamp and duration."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         duration = min(int(duration_minutes), self.MAX_EXPIRY)
