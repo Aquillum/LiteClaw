@@ -333,7 +333,7 @@ TOOLS = [
                 "properties": {
                     "goal": {"type": "string", "description": "The goal or instruction for the vision agent."},
                     "max_steps": {"type": "integer", "default": 40, "description": "Maximum steps allowed."},
-                    "is_correction": {"type": "boolean", "default": false, "description": "If true, this goal is treated as an immediate correction/feedback for the CURRENTLY running task."}
+                    "is_correction": {"type": "boolean", "default": False, "description": "If true, this goal is treated as an immediate correction/feedback for the CURRENTLY running task."}
                 },
                 "required": ["goal"]
             }
