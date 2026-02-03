@@ -104,7 +104,7 @@ You must output a JSON object describing the next action to take.
 5. **HOTKEY**: Press a key combination.
    - Required fields: "keys" (list of strings, e.g. ["ctrl", "c"], ["enter"], ["win"])
 6. **SCROLL**: Scroll the mouse wheel.
-   - Required fields: "direction" ("up" | "down"), "amount" (integer, e.g. 3)
+   - Required fields: "direction" ("up" | "down"), "amount" (integer, e.g. 3 clicks)
 7. **MOVE_TO**: Move the mouse without clicking.
    - Required fields: "point" ([x, y] normalized 0-1000)
 8. **WAIT**: Wait for a few seconds.
@@ -156,8 +156,8 @@ Do not return markdown code blocks. Just the raw JSON string.
                 ymin, xmin, ymax, xmax = bbox
                 center_x_norm = (xmin + xmax) / 2
                 center_y_norm = (ymin + ymax) / 2
-                target_x = int((center_x_norm / 1000) * self.screen_width)
-                target_y = int((center_y_norm / 1000) * self.screen_height)
+                target_x = int(round((center_x_norm / 1000) * self.screen_width))
+                target_y = int(round((center_y_norm / 1000) * self.screen_height))
                 
                 # Visual Debug
                 self.save_debug_artifact(screenshot, bbox, (target_x, target_y))
@@ -174,8 +174,8 @@ Do not return markdown code blocks. Just the raw JSON string.
                 ymin, xmin, ymax, xmax = bbox
                 center_x_norm = (xmin + xmax) / 2
                 center_y_norm = (ymin + ymax) / 2
-                target_x = int((center_x_norm / 1000) * self.screen_width)
-                target_y = int((center_y_norm / 1000) * self.screen_height)
+                target_x = int(round((center_x_norm / 1000) * self.screen_width))
+                target_y = int(round((center_y_norm / 1000) * self.screen_height))
                 
                 # Visual Debug
                 self.save_debug_artifact(screenshot, bbox, (target_x, target_y))
@@ -192,8 +192,8 @@ Do not return markdown code blocks. Just the raw JSON string.
                 ymin, xmin, ymax, xmax = bbox
                 center_x_norm = (xmin + xmax) / 2
                 center_y_norm = (ymin + ymax) / 2
-                target_x = int((center_x_norm / 1000) * self.screen_width)
-                target_y = int((center_y_norm / 1000) * self.screen_height)
+                target_x = int(round((center_x_norm / 1000) * self.screen_width))
+                target_y = int(round((center_y_norm / 1000) * self.screen_height))
                 
                 # Visual Debug
                 self.save_debug_artifact(screenshot, bbox, (target_x, target_y))
@@ -217,17 +217,18 @@ Do not return markdown code blocks. Just the raw JSON string.
         elif action_type == "SCROLL":
             direction = action_data.get("direction", "down")
             amount = action_data.get("amount", 3)
-            # PyAutoGUI scroll amount varies by OS, but usually 3-10 is a 'click'
+            # PyAutoGUI scroll amount varies by OS, but usually 120 is one 'click' on Windows
+            # User requirement: "1 scroll is equal to the scroll we do in mouse"
             scroll_val = -amount if direction == "down" else amount
-            pyautogui.scroll(scroll_val * 100) # Scaling for noticeable movement
-            return f"Scrolled {direction} by {amount}"
+            pyautogui.scroll(scroll_val * 120) 
+            return f"Scrolled {direction} by {amount} clicks"
 
         elif action_type == "MOVE_TO":
             point = action_data.get("point")
             if point:
                 px, py = point
-                target_x = int((px / 1000) * self.screen_width)
-                target_y = int((py / 1000) * self.screen_height)
+                target_x = int(round((px / 1000) * self.screen_width))
+                target_y = int(round((py / 1000) * self.screen_height))
                 pyautogui.moveTo(target_x, target_y, duration=0.5)
                 return f"Moved cursor to ({target_x}, {target_y})"
             return "Error: MOVE_TO missing point"
@@ -320,20 +321,31 @@ Do not return markdown code blocks. Just the raw JSON string.
     def run(self):
         print(f"[Vision] Started task: {self.goal}")
         
-        while self.step_count < self.max_steps:
+        current_max_steps = self.max_steps
+        
+        while self.step_count < current_max_steps:
             self.step_count += 1
+            
+            # Dynamic Extension & Thinking Logic
+            checkpoint_msg = ""
+            if self.step_count % 5 == 0:
+                current_max_steps += 5 # Dynamic extension based on user rule
+                checkpoint_msg = f"\n\n[SYSTEM] Checkpoint (Step {self.step_count}): Review your progress. Start planning the next phase. Session extended."
+                print(f"[Vision] Step {self.step_count}: Dynamic extension applied. New limit: {current_max_steps}")
             
             # 1. Capture
             screenshot, b64_img = self.capture_screen()
             
             # 2. Think
             try:
+                user_content_str = f"GOAL: {self.goal}\n\nHistory: {self.history}{checkpoint_msg}"
+                
                 messages = [
                     {"role": "system", "content": self.get_system_prompt()},
                     {
                         "role": "user", 
                         "content": [
-                            {"type": "text", "text": f"GOAL: {self.goal}\n\nHistory: {self.history}"},
+                            {"type": "text", "text": user_content_str},
                             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64_img}"}}
                         ]
                     }
@@ -370,4 +382,4 @@ Do not return markdown code blocks. Just the raw JSON string.
                 print(f"[Vision] Error: {e}")
                 return f"Task Failed: {e}"
         
-        return "Max steps reached."
+        return "Max steps reached (Dynamic limit)."
