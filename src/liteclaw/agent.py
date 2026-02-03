@@ -339,394 +339,407 @@ class LiteClawAgent:
         messages.append(user_msg_obj)
         add_message(session_id, user_msg_obj)
 
-        while True:
-            try:
-                # Robustness: Retry mechanism for API flakiness
-                max_retries = 3
-                retry_count = 0
-                response = None
-                
-                while retry_count < max_retries:
-                    try:
-                        response = litellm.completion(
-                            model=self.full_model_name,
-                            messages=messages,
-                            api_key=self.api_key,
-                            base_url=self.base_url,
-                            tools=TOOLS,
-                            tool_choice="auto",
-                            stream=True
-                        )
-                        break # Success
-                    except Exception as e:
-                        retry_count += 1
-                        yield f">>> [System]: Connection hiccup ({str(e)}). Retrying {retry_count}/{max_retries}...\n"
-                        import time
-                        time.sleep(2)
-                        if retry_count >= max_retries:
-                            raise e
+        from .browser_utils import set_task_active, pop_interjection
+        set_task_active(session_id, True)
 
-                full_content = ""
-                tool_calls = []
-                
-                for chunk in response:
-                    delta = chunk.choices[0].delta
-                    if delta.content:
-                        full_content += delta.content
-                        yield delta.content
+        try:
+            while True:
+                # Steering: Check if the user has injected new instructions while we were busy
+                interjection = pop_interjection(session_id)
+                if interjection:
+                    interjection_msg = {"role": "user", "content": f"[INTERJECTION]: {interjection}\n\nNOTE: This is a priority update from the user. Adapt your next action based on this."}
+                    messages.append(interjection_msg)
+                    add_message(session_id, interjection_msg)
+                    yield f">>> [System]: Steering interjection received: '{interjection[:50]}...'\n"
+
+                try:
+                    # Robustness: Retry mechanism for API flakiness
+                    max_retries = 3
+                    retry_count = 0
+                    response = None
                     
-                    if delta.tool_calls:
-                        for tc_delta in delta.tool_calls:
-                            idx = tc_delta.index
-                            if idx >= len(tool_calls):
-                                tool_calls.append({
-                                    "id": tc_delta.id,
-                                    "type": "function",
-                                    "function": {"name": "", "arguments": ""}
-                                })
-                            if tc_delta.id:
-                                tool_calls[idx]["id"] = tc_delta.id
-                            if tc_delta.function.name:
-                                tool_calls[idx]["function"]["name"] += tc_delta.function.name
-                            if tc_delta.function.arguments:
-                                tool_calls[idx]["function"]["arguments"] += tc_delta.function.arguments
-
-                if full_content:
-                    assistant_msg = {"role": "assistant", "content": full_content}
-                    messages.append(assistant_msg)
-                    add_message(session_id, assistant_msg)
-
-                if tool_calls:
-                    executed_calls = set()
-                    assistant_msg_tools = {"role": "assistant", "content": None, "tool_calls": tool_calls}
-                    messages.append(assistant_msg_tools)
-                    add_message(session_id, assistant_msg_tools)
-
-                    stop_batch = False
-                    consecutive_failures = 0
-                    screenshot_sent_this_turn = False  # Track if browser already sent a screenshot
-
-                    for tc in tool_calls:
-                        if stop_batch: break
-                        
-                        func_name = tc["function"]["name"]
-                        func_args_str = tc["function"]["arguments"]
-                        call_key = (func_name, func_args_str)
-                        
-                        if call_key in executed_calls:
-                            yield f">>> [Skipped duplicate call: {func_name}]\n"
-                            continue
-                        executed_calls.add(call_key)
-                        
-                        yield f">>> --- 🛠️ Tool Call: {func_name} ---\n"
-                        yield f">>> Arguments: {func_args_str}\n"
-                        
+                    while retry_count < max_retries:
                         try:
-                            func_args = json.loads(func_args_str)
-                            
-                            if func_name == "execute_command":
-                                yield f">>> [Shell]: Executing command...\n"
-                                tool_output = execute_command(func_args.get("command"))
-                                display_output = (str(tool_output)[:500] + '...') if tool_output and len(str(tool_output)) > 500 else str(tool_output)
-                                yield f">>> [Result]: {display_output}\n"
-                            
-                            elif func_name == "update_soul":
-                                yield f">>> [Soul]: Updating user memory...\n"
-                                tool_output = update_soul_memory(func_args.get("content"))
-                                yield f">>> [Result]: {tool_output}\n"
-
-                            elif func_name == "update_personality":
-                                yield f">>> [Personality]: Evolving...\n"
-                                tool_output = update_personality_memory(func_args.get("content"))
-                                yield f">>> [Result]: {tool_output}\n"
-
-                            elif func_name == "update_subconscious":
-                                yield f">>> [Subconscious]: Storing insight...\n"
-                                from .meta_memory import update_subconscious_memory
-                                tool_output = update_subconscious_memory(func_args.get("content"))
-                                yield f">>> [Result]: {tool_output}\n"
-
-                            elif func_name == "update_conscious":
-                                yield f">>> [Conscious]: Setting active focus...\n"
-                                duration = func_args.get("duration_minutes", 20)
-                                conscious_mind.set_active_focus(func_args.get("focus_intent"), duration_minutes=duration)
-                                tool_output = f"Conscious focus updated. Intent is now active for {duration} minutes."
-                                yield f">>> [Result]: {tool_output}\n"
-
-                            # ... [Other tool handlers remain here, simply consolidated logic below] ...
-
-                            elif func_name == "delegate_task":
-                                from .subagent import sub_agent_manager
-                                from .main import WHATSAPP_BRIDGE_URL
-                                import httpx
-                                
-                                sub_agent_name = func_args.get("sub_agent_name")
-                                task = func_args.get("task")
-                                yield f">>> [Sub-Agent]: Delegating background task to '{sub_agent_name}'...\n"
-                                tool_output = sub_agent_manager.delegate_task(session_id, sub_agent_name, task, platform=platform)
-                                yield f"🔔 [System]: Background agent '{sub_agent_name}' has been started for task: {task[:100]}...\n"
-                                yield f">>> [Status]: {tool_output}\n"
-                                
-                                # Send immediate notification to user via their platform
-                                try:
-                                    import asyncio
-                                    async def notify_user():
-                                        if platform not in ["whatsapp", "telegram", "slack"]:
-                                            return
-                                        async with httpx.AsyncClient(timeout=10.0) as client:
-                                            await client.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json={
-                                                "to": session_id,
-                                                "message": f"[LiteClaw] 🤖 **Sub-Agent '{sub_agent_name}' Started**\n\n📋 Task: {task[:200]}{'...' if len(task) > 200 else ''}\n\n⏳ Working in the background... I'll notify you when it's done!",
-                                                "platform": platform
-                                            })
-                                    
-                                    # Run the async notification
-                                    try:
-                                        loop = asyncio.get_event_loop()
-                                        if loop.is_running():
-                                            asyncio.ensure_future(notify_user())
-                                        else:
-                                            asyncio.run(notify_user())
-                                    except RuntimeError:
-                                        asyncio.run(notify_user())
-                                    
-                                    yield f">>> [Notification]: Sent 'sub-agent started' message to user via {platform.title()}\n"
-                                except Exception as e:
-                                    yield f">>> [Notification Warning]: Could not notify user: {e}\n"
-                                
-                                # STOP EXECUTION after delegation to prevent Redundant Work
-                                stop_batch = True 
-
-                            # ... [Handling other tool calls logic] ...
-                            elif func_name == "list_sub_agents":
-                                from .subagent import sub_agent_manager
-                                yield f">>> [Sub-Agent]: Listing background agents...\n"
-                                sub_agents = sub_agent_manager.list_sub_agents(session_id)
-                                tool_output = json.dumps(sub_agents, indent=2)
-                                yield f">>> [Found]: {len(sub_agents)} sub-agents.\n"
-                            
-                            elif func_name == "kill_sub_agent":
-                                from .subagent import sub_agent_manager
-                                sub_agent_name = func_args.get("sub_agent_name")
-                                yield f">>> [Sub-Agent]: Terminating '{sub_agent_name}'...\n"
-                                tool_output = sub_agent_manager.kill_sub_agent(session_id, sub_agent_name)
-                                yield f">>> [Result]: {tool_output}\n"
-                            
-                            elif func_name == "kill_all_sub_agents":
-                                from .subagent import sub_agent_manager
-                                yield f">>> [Sub-Agent]: Terminating all sub-agents...\n"
-                                tool_output = sub_agent_manager.kill_all_sub_agents(session_id)
-                                yield f">>> [Result]: {tool_output}\n"
-
-
-                            elif func_name == "create_session":
-                                from .memory import create_session
-                                new_sid = func_args.get("session_id")
-                                success = create_session(new_sid, parent_session_id=session_id)
-                                tool_output = f"Session '{new_sid}' created." if success else "Error creating session."
-                                yield f">>> [Session]: {tool_output}\n"
-
-                            elif func_name == "fetch_url_content":
-                                from .web_utils import fetch_url_content
-                                tool_output = fetch_url_content(func_args.get("url"))
-                                yield f">>> [Web]: Fetched {len(tool_output)} chars.\n"
-
-                            elif func_name == "manage_skills":
-                                from .web_utils import download_skill, get_skill_content, list_skills
-                                action = func_args.get("action")
-                                if action == "download":
-                                    tool_output = download_skill(func_args.get("url"), func_args.get("skill_name"))
-                                elif action == "read":
-                                     tool_output = get_skill_content(func_args.get("skill_name"))
-                                elif action == "list":
-                                    tool_output = ", ".join(list_skills())
-                                yield f">>> [Skills]: {action} complete.\n"
-                            
-                            elif func_name == "manage_cron_job":
-                                from .scheduler import cron_manager
-                                action = func_args.get("action")
-                                
-                                if action == "create":
-                                    yield f">>> [Cron]: Creating job '{func_args.get('name')}'...\n"
-                                    job_id = cron_manager.create_job(
-                                        func_args.get("name"), 
-                                        func_args.get("schedule_type"), 
-                                        func_args.get("schedule_value"), 
-                                        func_args.get("task")
-                                    )
-                                    tool_output = f"Job created with ID: {job_id}. Type: {func_args.get('schedule_type')}"
-                                    if func_args.get('schedule_type') == 'webhook':
-                                        tool_output += f"\nWebhook URL: /cron/webhook/{job_id}"
-                                    
-                                elif action == "list":
-                                    yield f">>> [Cron]: Listing jobs...\n"
-                                    jobs = cron_manager.list_jobs()
-                                    tool_output = json.dumps(jobs, indent=2, default=str)
-                                    yield f">>> [Found]: {len(jobs)} jobs.\n"
-                                    
-                                elif action == "delete":
-                                    yield f">>> [Cron]: Deleting job '{func_args.get('job_id')}'...\n"
-                                    cron_manager.delete_job(func_args.get("job_id"))
-                                    tool_output = "Job deleted."
-                                else:
-                                    tool_output = "Invalid action."
-
-                            elif func_name == "send_media":
-                                media_type = func_args.get('type')
-                                
-                                yield f">>> [Media]: Sending {media_type}...\n"
-                                
-                                if platform not in ["whatsapp", "telegram", "slack"]:
-                                    tool_output = f"Skipping bridge notification for platform: {platform}. Media saved locally if applicable."
-                                    yield f">>> [Media Result]: {tool_output}\n"
-                                    continue
-
-                                from .main import WHATSAPP_BRIDGE_URL
-                                import requests
-                                
-                                caption = func_args.get("caption") or ""
-                                if caption:
-                                    caption = f"[LiteClaw] {caption}"
-                                else:
-                                    caption = "[LiteClaw]"
-
-                                media_payload = {
-                                    "to": session_id,
-                                    "url_or_path": func_args.get("url_or_path"),
-                                    "caption": caption,
-                                    "type": media_type,
-                                    "platform": platform,
-                                    "is_media": True
-                                }
-                                
-                                try:
-                                    resp = requests.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json=media_payload)
-                                    tool_output = f"Media sent successfully. Status: {resp.status_code}"
-                                except Exception as e:
-                                    tool_output = f"Failed to send media: {str(e)}"
-                                yield f">>> [Media Result]: {tool_output}\n"
-
-                            elif func_name == "vision_task":
-                                from .vision_agent import VisionAgent
-                                goal = func_args.get("goal")
-                                steps = func_args.get("max_steps", 15)
-                                yield f">>> [Vision]: Starting agent with goal: {goal}\n"
-                                
-                                try:
-                                    v_agent = VisionAgent(goal, session_id, platform, max_steps=steps)
-                                    tool_output = v_agent.run()
-                                except Exception as e:
-                                    tool_output = f"Vision Agent Failed: {str(e)}"
-                                
-                                yield f">>> [Vision Result]: {tool_output}\n"
-
-                            elif func_name == "search_and_send_gif":
-                                yield f">>> [GIF]: Searching for '{func_args.get('query')}'...\n"
-                                
-                                if platform not in ["whatsapp", "telegram", "slack"]:
-                                    tool_output = f"Skipping GIF send via bridge for platform: {platform}."
-                                    yield f">>> [GIF Result]: {tool_output}\n"
-                                    continue
-
-                                from .main import WHATSAPP_BRIDGE_URL
-                                import requests
-                                import random
-                                
-                                query = func_args.get("query")
-                                caption = func_args.get("caption") or ""
-                                giphy_key = settings.GIPHY_API_KEY
-                                
-                                if not giphy_key:
-                                    tool_output = "GIPHY_API_KEY is not configured. Ask the user to run onboarding or set it in config.json."
-                                else:
-                                    try:
-                                        # Search Giphy
-                                        giphy_url = "https://api.giphy.com/v1/gifs/search"
-                                        params = {
-                                            "api_key": giphy_key,
-                                            "q": query,
-                                            "limit": 20,
-                                            "rating": "pg"
-                                        }
-                                        r = requests.get(giphy_url, params=params)
-                                        data = r.json()
-                                        gifs = data.get('data', [])
-                                        
-                                        if not gifs:
-                                            tool_output = f"No GIFs found for '{query}'"
-                                        else:
-                                            best_gif = random.choice(gifs)['images']['original']['url']
-                                            
-                                            # Tag caption
-                                            final_caption = f"[LiteClaw] {caption}" if caption else "[LiteClaw]"
-                                            
-                                            media_payload = {
-                                                "to": session_id,
-                                                "url_or_path": best_gif,
-                                                "caption": final_caption,
-                                                "type": "gif",
-                                                "platform": platform,
-                                                "is_media": True
-                                            }
-                                            
-                                            resp = requests.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json=media_payload)
-                                            tool_output = f"Hilarious GIF sent! (Query: {query})"
-                                    except Exception as e:
-                                        tool_output = f"Giphy Search Error: {str(e)}"
-                                
-                                yield f">>> [GIF Result]: {tool_output}\n"
-                            
-                            else:
-                                tool_output = f"Unknown tool: {func_name}"
-
-                            yield f">>> --- ✅ Done: {func_name} ---\n\n"
-                            
-                            tool_msg = {"tool_call_id": tc["id"], "role": "tool", "name": func_name, "content": tool_output}
-                            messages.append(tool_msg)
-                            add_message(session_id, tool_msg)
-
+                            response = litellm.completion(
+                                model=self.full_model_name,
+                                messages=messages,
+                                api_key=self.api_key,
+                                base_url=self.base_url,
+                                tools=TOOLS,
+                                tool_choice="auto",
+                                stream=True
+                            )
+                            break # Success
                         except Exception as e:
-                            import traceback
-                            traceback.print_exc()
-                            error_msg = f"Error: {str(e)}"
-                            yield f">>> [CRITICAL TOOL ERROR]: {error_msg}\n"
-                            tool_msg = {"tool_call_id": tc["id"], "role": "tool", "name": func_name, "content": error_msg}
-                            messages.append(tool_msg)
-                            add_message(session_id, tool_msg)
+                            retry_count += 1
+                            yield f">>> [System]: Connection hiccup ({str(e)}). Retrying {retry_count}/{max_retries}...\n"
+                            import time
+                            time.sleep(2)
+                            if retry_count >= max_retries:
+                                raise e
 
-                        # --- GLOBAL FAILURE TRACKER ---
-                        # Check the content of the last added message (success or error)
-                        last_content = str(messages[-1]["content"]).lower()
-                        is_failure = "error" in last_content or "failed" in last_content or "exception" in last_content
-                        
-                        if is_failure:
-                            consecutive_failures += 1
-                        else:
-                            consecutive_failures = 0 # Reset on success
-                            
-                        # CHECK THRESHOLD (3 Failures)
-                        if consecutive_failures >= 3:
-                            yield f">>> [SYSTEM]: ⛔ 3 Consecutive Failures Detected ({consecutive_failures}). Triggering Analysis Mode.\n"
-                            
-                            # Append a system message to FORCE the AI to stop and think
-                            halt_msg = {
-                                "role": "user", 
-                                "content": "\n\n" + "="*40 + "\n[SYSTEM HALT - TOO MANY FAILURES]\n" + "="*40 + "\n⛔ You have failed 3 times in a row. EXECUTION STOPPED.\n\nREQUIRED ACTION:\n1. 🛑 STOP blindly retrying.\n2. 🧠 ENTER 'THINKING MODE': Analyze the last 3 errors step-by-step.\n3. 🔍 IDENTIFY the root cause (Is it syntax? Authority? Wrong tool? Missing dependency?)\n4. 📝 PLAN a corrected approach.\n5. RESTART execution with the new plan.\n"
-                            }
-                            messages.append(halt_msg)
-                            add_message(session_id, halt_msg)
-                            
-                            stop_batch = True # Stop processing further tools in this batch to force reflection
+                    full_content = ""
+                    tool_calls = []
                     
-                    continue 
+                    for chunk in response:
+                        delta = chunk.choices[0].delta
+                        if delta.content:
+                            full_content += delta.content
+                            yield delta.content
+                        
+                        if delta.tool_calls:
+                            for tc_delta in delta.tool_calls:
+                                idx = tc_delta.index
+                                if idx >= len(tool_calls):
+                                    tool_calls.append({
+                                        "id": tc_delta.id,
+                                        "type": "function",
+                                        "function": {"name": "", "arguments": ""}
+                                    })
+                                if tc_delta.id:
+                                    tool_calls[idx]["id"] = tc_delta.id
+                                if tc_delta.function.name:
+                                    tool_calls[idx]["function"]["name"] += tc_delta.function.name
+                                if tc_delta.function.arguments:
+                                    tool_calls[idx]["function"]["arguments"] += tc_delta.function.arguments
 
-                break
+                    if full_content:
+                        assistant_msg = {"role": "assistant", "content": full_content}
+                        messages.append(assistant_msg)
+                        add_message(session_id, assistant_msg)
 
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                yield f">>> [CRITICAL AI ERROR]: {str(e)}\n"
-                break
+                    if tool_calls:
+                        executed_calls = set()
+                        assistant_msg_tools = {"role": "assistant", "content": None, "tool_calls": tool_calls}
+                        messages.append(assistant_msg_tools)
+                        add_message(session_id, assistant_msg_tools)
+
+                        stop_batch = False
+                        consecutive_failures = 0
+                        screenshot_sent_this_turn = False  # Track if browser already sent a screenshot
+
+                        for tc in tool_calls:
+                            if stop_batch: break
+                            
+                            func_name = tc["function"]["name"]
+                            func_args_str = tc["function"]["arguments"]
+                            call_key = (func_name, func_args_str)
+                            
+                            if call_key in executed_calls:
+                                yield f">>> [Skipped duplicate call: {func_name}]\n"
+                                continue
+                            executed_calls.add(call_key)
+                        
+                            yield f">>> --- 🛠️ Tool Call: {func_name} ---\n"
+                            yield f">>> Arguments: {func_args_str}\n"
+                        
+                            try:
+                                func_args = json.loads(func_args_str)
+                            
+                                if func_name == "execute_command":
+                                    yield f">>> [Shell]: Executing command...\n"
+                                    tool_output = execute_command(func_args.get("command"))
+                                    display_output = (str(tool_output)[:500] + '...') if tool_output and len(str(tool_output)) > 500 else str(tool_output)
+                                    yield f">>> [Result]: {display_output}\n"
+                            
+                                elif func_name == "update_soul":
+                                    yield f">>> [Soul]: Updating user memory...\n"
+                                    tool_output = update_soul_memory(func_args.get("content"))
+                                    yield f">>> [Result]: {tool_output}\n"
+
+                                elif func_name == "update_personality":
+                                    yield f">>> [Personality]: Evolving...\n"
+                                    tool_output = update_personality_memory(func_args.get("content"))
+                                    yield f">>> [Result]: {tool_output}\n"
+
+                                elif func_name == "update_subconscious":
+                                    yield f">>> [Subconscious]: Storing insight...\n"
+                                    from .meta_memory import update_subconscious_memory
+                                    tool_output = update_subconscious_memory(func_args.get("content"))
+                                    yield f">>> [Result]: {tool_output}\n"
+
+                                elif func_name == "update_conscious":
+                                    yield f">>> [Conscious]: Setting active focus...\n"
+                                    duration = func_args.get("duration_minutes", 20)
+                                    conscious_mind.set_active_focus(func_args.get("focus_intent"), duration_minutes=duration)
+                                    tool_output = f"Conscious focus updated. Intent is now active for {duration} minutes."
+                                    yield f">>> [Result]: {tool_output}\n"
+
+                                # ... [Other tool handlers remain here, simply consolidated logic below] ...
+
+                                elif func_name == "delegate_task":
+                                    from .subagent import sub_agent_manager
+                                    from .main import WHATSAPP_BRIDGE_URL
+                                    import httpx
+                                
+                                    sub_agent_name = func_args.get("sub_agent_name")
+                                    task = func_args.get("task")
+                                    yield f">>> [Sub-Agent]: Delegating background task to '{sub_agent_name}'...\n"
+                                    tool_output = sub_agent_manager.delegate_task(session_id, sub_agent_name, task, platform=platform)
+                                    yield f"🔔 [System]: Background agent '{sub_agent_name}' has been started for task: {task[:100]}...\n"
+                                    yield f">>> [Status]: {tool_output}\n"
+                                
+                                    # Send immediate notification to user via their platform
+                                    try:
+                                        import asyncio
+                                        async def notify_user():
+                                            if platform not in ["whatsapp", "telegram", "slack"]:
+                                                return
+                                            async with httpx.AsyncClient(timeout=10.0) as client:
+                                                await client.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json={
+                                                    "to": session_id,
+                                                    "message": f"[LiteClaw] 🤖 **Sub-Agent '{sub_agent_name}' Started**\n\n📋 Task: {task[:200]}{'...' if len(task) > 200 else ''}\n\n⏳ Working in the background... I'll notify you when it's done!",
+                                                    "platform": platform
+                                                })
+                                    
+                                        # Run the async notification
+                                        try:
+                                            loop = asyncio.get_event_loop()
+                                            if loop.is_running():
+                                                asyncio.ensure_future(notify_user())
+                                            else:
+                                                asyncio.run(notify_user())
+                                        except RuntimeError:
+                                            asyncio.run(notify_user())
+                                    
+                                        yield f">>> [Notification]: Sent 'sub-agent started' message to user via {platform.title()}\n"
+                                    except Exception as e:
+                                        yield f">>> [Notification Warning]: Could not notify user: {e}\n"
+                                
+                                    # STOP EXECUTION after delegation to prevent Redundant Work
+                                    stop_batch = True 
+
+                                # ... [Handling other tool calls logic] ...
+                                elif func_name == "list_sub_agents":
+                                    from .subagent import sub_agent_manager
+                                    yield f">>> [Sub-Agent]: Listing background agents...\n"
+                                    sub_agents = sub_agent_manager.list_sub_agents(session_id)
+                                    tool_output = json.dumps(sub_agents, indent=2)
+                                    yield f">>> [Found]: {len(sub_agents)} sub-agents.\n"
+                            
+                                elif func_name == "kill_sub_agent":
+                                    from .subagent import sub_agent_manager
+                                    sub_agent_name = func_args.get("sub_agent_name")
+                                    yield f">>> [Sub-Agent]: Terminating '{sub_agent_name}'...\n"
+                                    tool_output = sub_agent_manager.kill_sub_agent(session_id, sub_agent_name)
+                                    yield f">>> [Result]: {tool_output}\n"
+                            
+                                elif func_name == "kill_all_sub_agents":
+                                    from .subagent import sub_agent_manager
+                                    yield f">>> [Sub-Agent]: Terminating all sub-agents...\n"
+                                    tool_output = sub_agent_manager.kill_all_sub_agents(session_id)
+                                    yield f">>> [Result]: {tool_output}\n"
+
+
+                                elif func_name == "create_session":
+                                    from .memory import create_session
+                                    new_sid = func_args.get("session_id")
+                                    success = create_session(new_sid, parent_session_id=session_id)
+                                    tool_output = f"Session '{new_sid}' created." if success else "Error creating session."
+                                    yield f">>> [Session]: {tool_output}\n"
+
+                                elif func_name == "fetch_url_content":
+                                    from .web_utils import fetch_url_content
+                                    tool_output = fetch_url_content(func_args.get("url"))
+                                    yield f">>> [Web]: Fetched {len(tool_output)} chars.\n"
+
+                                elif func_name == "manage_skills":
+                                    from .web_utils import download_skill, get_skill_content, list_skills
+                                    action = func_args.get("action")
+                                    if action == "download":
+                                        tool_output = download_skill(func_args.get("url"), func_args.get("skill_name"))
+                                    elif action == "read":
+                                         tool_output = get_skill_content(func_args.get("skill_name"))
+                                    elif action == "list":
+                                        tool_output = ", ".join(list_skills())
+                                    yield f">>> [Skills]: {action} complete.\n"
+                            
+                                elif func_name == "manage_cron_job":
+                                    from .scheduler import cron_manager
+                                    action = func_args.get("action")
+                                
+                                    if action == "create":
+                                        yield f">>> [Cron]: Creating job '{func_args.get('name')}'...\n"
+                                        job_id = cron_manager.create_job(
+                                            func_args.get("name"), 
+                                            func_args.get("schedule_type"), 
+                                            func_args.get("schedule_value"), 
+                                            func_args.get("task")
+                                        )
+                                        tool_output = f"Job created with ID: {job_id}. Type: {func_args.get('schedule_type')}"
+                                        if func_args.get('schedule_type') == 'webhook':
+                                            tool_output += f"\nWebhook URL: /cron/webhook/{job_id}"
+                                    
+                                    elif action == "list":
+                                        yield f">>> [Cron]: Listing jobs...\n"
+                                        jobs = cron_manager.list_jobs()
+                                        tool_output = json.dumps(jobs, indent=2, default=str)
+                                        yield f">>> [Found]: {len(jobs)} jobs.\n"
+                                    
+                                    elif action == "delete":
+                                        yield f">>> [Cron]: Deleting job '{func_args.get('job_id')}'...\n"
+                                        cron_manager.delete_job(func_args.get("job_id"))
+                                        tool_output = "Job deleted."
+                                    else:
+                                        tool_output = "Invalid action."
+
+                                elif func_name == "send_media":
+                                    media_type = func_args.get('type')
+                                
+                                    yield f">>> [Media]: Sending {media_type}...\n"
+                                
+                                    if platform not in ["whatsapp", "telegram", "slack"]:
+                                        tool_output = f"Skipping bridge notification for platform: {platform}. Media saved locally if applicable."
+                                        yield f">>> [Media Result]: {tool_output}\n"
+                                        continue
+
+                                    from .main import WHATSAPP_BRIDGE_URL
+                                    import requests
+                                
+                                    caption = func_args.get("caption") or ""
+                                    if caption:
+                                        caption = f"[LiteClaw] {caption}"
+                                    else:
+                                        caption = "[LiteClaw]"
+
+                                    media_payload = {
+                                        "to": session_id,
+                                        "url_or_path": func_args.get("url_or_path"),
+                                        "caption": caption,
+                                        "type": media_type,
+                                        "platform": platform,
+                                        "is_media": True
+                                    }
+                                
+                                    try:
+                                        resp = requests.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json=media_payload)
+                                        tool_output = f"Media sent successfully. Status: {resp.status_code}"
+                                    except Exception as e:
+                                        tool_output = f"Failed to send media: {str(e)}"
+                                    yield f">>> [Media Result]: {tool_output}\n"
+
+                                elif func_name == "vision_task":
+                                    from .vision_agent import VisionAgent
+                                    goal = func_args.get("goal")
+                                    steps = func_args.get("max_steps", 15)
+                                    yield f">>> [Vision]: Starting agent with goal: {goal}\n"
+                                
+                                    try:
+                                        v_agent = VisionAgent(goal, session_id, platform, max_steps=steps)
+                                        tool_output = v_agent.run()
+                                    except Exception as e:
+                                        tool_output = f"Vision Agent Failed: {str(e)}"
+                                
+                                    yield f">>> [Vision Result]: {tool_output}\n"
+
+                                elif func_name == "search_and_send_gif":
+                                    yield f">>> [GIF]: Searching for '{func_args.get('query')}'...\n"
+                                
+                                    if platform not in ["whatsapp", "telegram", "slack"]:
+                                        tool_output = f"Skipping GIF send via bridge for platform: {platform}."
+                                        yield f">>> [GIF Result]: {tool_output}\n"
+                                        continue
+
+                                    from .main import WHATSAPP_BRIDGE_URL
+                                    import requests
+                                    import random
+                                
+                                    query = func_args.get("query")
+                                    caption = func_args.get("caption") or ""
+                                    giphy_key = settings.GIPHY_API_KEY
+                                
+                                    if not giphy_key:
+                                        tool_output = "GIPHY_API_KEY is not configured. Ask the user to run onboarding or set it in config.json."
+                                    else:
+                                        try:
+                                            # Search Giphy
+                                            giphy_url = "https://api.giphy.com/v1/gifs/search"
+                                            params = {
+                                                "api_key": giphy_key,
+                                                "q": query,
+                                                "limit": 20,
+                                                "rating": "pg"
+                                            }
+                                            r = requests.get(giphy_url, params=params)
+                                            data = r.json()
+                                            gifs = data.get('data', [])
+                                        
+                                            if not gifs:
+                                                tool_output = f"No GIFs found for '{query}'"
+                                            else:
+                                                best_gif = random.choice(gifs)['images']['original']['url']
+                                            
+                                                # Tag caption
+                                                final_caption = f"[LiteClaw] {caption}" if caption else "[LiteClaw]"
+                                            
+                                                media_payload = {
+                                                    "to": session_id,
+                                                    "url_or_path": best_gif,
+                                                    "caption": final_caption,
+                                                    "type": "gif",
+                                                    "platform": platform,
+                                                    "is_media": True
+                                                }
+                                            
+                                                resp = requests.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json=media_payload)
+                                                tool_output = f"Hilarious GIF sent! (Query: {query})"
+                                        except Exception as e:
+                                            tool_output = f"Giphy Search Error: {str(e)}"
+                                
+                                    yield f">>> [GIF Result]: {tool_output}\n"
+                            
+                                else:
+                                    tool_output = f"Unknown tool: {func_name}"
+
+                                yield f">>> --- ✅ Done: {func_name} ---\n\n"
+                            
+                                tool_msg = {"tool_call_id": tc["id"], "role": "tool", "name": func_name, "content": tool_output}
+                                messages.append(tool_msg)
+                                add_message(session_id, tool_msg)
+
+                            except Exception as e:
+                                import traceback
+                                traceback.print_exc()
+                                error_msg = f"Error: {str(e)}"
+                                yield f">>> [CRITICAL TOOL ERROR]: {error_msg}\n"
+                                tool_msg = {"tool_call_id": tc["id"], "role": "tool", "name": func_name, "content": error_msg}
+                                messages.append(tool_msg)
+                                add_message(session_id, tool_msg)
+
+                            # --- GLOBAL FAILURE TRACKER ---
+                            # Check the content of the last added message (success or error)
+                            last_content = str(messages[-1]["content"]).lower()
+                            is_failure = "error" in last_content or "failed" in last_content or "exception" in last_content
+                        
+                            if is_failure:
+                                consecutive_failures += 1
+                            else:
+                                consecutive_failures = 0 # Reset on success
+                            
+                            # CHECK THRESHOLD (3 Failures)
+                            if consecutive_failures >= 3:
+                                yield f">>> [SYSTEM]: ⛔ 3 Consecutive Failures Detected ({consecutive_failures}). Triggering Analysis Mode.\n"
+                            
+                                # Append a system message to FORCE the AI to stop and think
+                                halt_msg = {
+                                    "role": "user", 
+                                    "content": "\n\n" + "="*40 + "\n[SYSTEM HALT - TOO MANY FAILURES]\n" + "="*40 + "\n⛔ You have failed 3 times in a row. EXECUTION STOPPED.\n\nREQUIRED ACTION:\n1. 🛑 STOP blindly retrying.\n2. 🧠 ENTER 'THINKING MODE': Analyze the last 3 errors step-by-step.\n3. 🔍 IDENTIFY the root cause (Is it syntax? Authority? Wrong tool? Missing dependency?)\n4. 📝 PLAN a corrected approach.\n5. RESTART execution with the new plan.\n"
+                                }
+                                messages.append(halt_msg)
+                                add_message(session_id, halt_msg)
+                            
+                                stop_batch = True # Stop processing further tools in this batch to force reflection
+                    
+                        continue 
+
+                    break
+
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    yield f">>> [CRITICAL AI ERROR]: {str(e)}\n"
+        finally:
+            set_task_active(session_id, False)
 
 agent = LiteClawAgent()
 def process_message(message: str, session_id: str = "default", platform: str = "whatsapp"):

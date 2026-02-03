@@ -17,6 +17,8 @@ class ActionResult:
 # Global storage for pending questions (session_id -> question)
 _pending_questions = {}
 _pending_answers = {}
+_interjections = {}
+_active_tasks = {} # session_id -> bool
 
 # Platform-specific endpoint mappings
 BRIDGE_SEND_ENDPOINT = "/whatsapp/send"
@@ -76,6 +78,25 @@ def set_human_answer(session_id: str, answer: str):
 def get_pending_question(session_id: str) -> str:
     """Check if there's a pending question for this session."""
     return _pending_questions.get(session_id)
+
+def set_interjection(session_id: str, content: str):
+    """Store a user message as an interjection for an active task."""
+    _interjections[session_id] = content
+
+def pop_interjection(session_id: str) -> Optional[str]:
+    """Retrieve and clear an interjection for a session."""
+    return _interjections.pop(session_id, None)
+
+def set_task_active(session_id: str, is_active: bool):
+    """Mark a session as having an active vision or long-running task."""
+    if is_active:
+        _active_tasks[session_id] = True
+    else:
+        _active_tasks.pop(session_id, None)
+
+def is_task_active(session_id: str) -> bool:
+    """Check if a session has an active long-running task."""
+    return _active_tasks.get(session_id, False)
 
 def _run_async_task_in_thread(coro):
     """Run an async coroutine in a dedicated thread with its own event loop."""

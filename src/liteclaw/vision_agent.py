@@ -292,7 +292,7 @@ Do not return markdown code blocks. Just the raw JSON string.
         
         # Only attempt bridge send if we are on a bridge platform
         if self.platform not in ["whatsapp", "telegram", "slack"]:
-            # print(f"[Vision] Screenshot saved locally: {path} (Skipping bridge for platform: {self.platform})")
+            # print(f"[Vision) Screenshot saved locally: {path} (Skipping bridge for platform: {self.platform})")
             return
 
         try:
@@ -334,65 +334,89 @@ Do not return markdown code blocks. Just the raw JSON string.
     def run(self):
         print(f"[Vision] Started task: {self.goal}")
         
+        from .browser_utils import set_task_active, pop_interjection
+        set_task_active(self.session_id, True)
+        
         current_max_steps = self.max_steps
         
-        while self.step_count < current_max_steps:
-            self.step_count += 1
-            
-            # Dynamic Extension & Thinking Logic
-            checkpoint_msg = ""
-            if self.step_count % 5 == 0:
-                current_max_steps += 5 # Dynamic extension based on user rule
-                checkpoint_msg = f"\n\n[SYSTEM] Checkpoint (Step {self.step_count}): Review your progress. Start planning the next phase. Session extended."
-                print(f"[Vision] Step {self.step_count}: Dynamic extension applied. New limit: {current_max_steps}")
-            
-            # 1. Capture
-            screenshot, b64_img = self.capture_screen()
-            
-            # 2. Think
-            try:
-                user_content_str = f"GOAL: {self.goal}\n\nHistory: {self.history}{checkpoint_msg}"
+        try:
+            while self.step_count < current_max_steps:
+                self.step_count += 1
                 
-                messages = [
-                    {"role": "system", "content": self.get_system_prompt()},
-                    {
-                        "role": "user", 
-                        "content": [
-                            {"type": "text", "text": user_content_str},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64_img}"}}
-                        ]
-                    }
-                ]
+                # Check for User Interjections (Steering)
+                interjection = pop_interjection(self.session_id)
+                if interjection:
+                    print(f"[Vision] ⚡ User Interjection: {interjection}")
+                    interdiction_msg = f"[STEERING UPDATE]: User has modified the goal or provided new instructions: {interjection}"
+                    self.history.append(f"INTERJECTION: {interjection}")
+                    # Prepend to the user content so the LLM identifies it as a priority update
+                    steering_context = f"\n\n🚨 {interdiction_msg}\nPLEASE ADAPT YOUR PLAN ACCORDINGLY."
+                else:
+                    steering_context = ""
                 
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages
-                )
+                # Dynamic Extension & Thinking Logic
+                checkpoint_msg = ""
+                if self.step_count % 5 == 0:
+                    current_max_steps += 5 
+                    checkpoint_msg = f"\n\n[SYSTEM] Checkpoint (Step {self.step_count}): Review your progress. Session extended."
+                    print(f"[Vision] Step {self.step_count}: Dynamic extension applied. New limit: {current_max_steps}")
                 
-                content = response.choices[0].message.content
-                action_data = self.parse_response(content)
+                # 1. Capture
+                screenshot, b64_img = self.capture_screen()
                 
-                if not action_data:
-                    print("[Vision] Failed to parse response")
-                    continue
-                
-                # 3. Act
-                result_msg = self.execute_action(action_data, screenshot)
-                
-                if result_msg == "FINISH":
-                    final_reason = action_data.get('reason', 'Done')
-                    print(f"[Vision] Finished: {final_reason}")
-                    return f"Task Completed. Reason: {final_reason}\nHistory: {self.history}"
-                
-                # Record History
-                summary = f"Step {self.step_count}: {action_data.get('thought')} -> {action_data.get('action')} => {result_msg}"
-                self.history.append(summary)
-                print(f"[Vision] {summary}")
-                
-                time.sleep(1)
+                # 2. Think
+                try:
+                    user_content_str = f"GOAL: {self.goal}\n\nHistory: {self.history}{checkpoint_msg}{steering_context}"
+                    
+                    messages = [
+                        {"role": "system", "content": self.get_system_prompt()},
+                        {
+                            "role": "user", 
+                            "content": [
+                                {"type": "text", "text": user_content_str},
+                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64_img}"}}
+                            ]
+                        }
+                    ]
+                    
+                    response = self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=messages
+                    )
+                    
+                    content = response.choices[0].message.content
+                    action_data = self.parse_response(content)
+                    
+                    if not action_data:
+                        print("[Vision] Failed to parse response")
+                        continue
+                    
+                    # 3. Act
+                    result_msg = self.execute_action(action_data, screenshot)
+                    
+                    if result_msg == "FINISH":
+                        final_reason = action_data.get('reason', 'Done')
+                        print(f"[Vision] Finished: {final_reason}")
+                        return f"Task Completed. Reason: {final_reason}\nHistory: {self.history}"
+                    
+                    # Record History
+                    summary = f"Step {self.step_count}: {action_data.get('thought')} -> {action_data.get('action')} => {result_msg}"
+                    self.history.append(summary)
+                    print(f"[Vision] {summary}")
+                    
+                    time.sleep(1)
 
-            except Exception as e:
-                print(f"[Vision] Error: {e}")
-                return f"Task Failed: {e}"
+                except Exception as e:
+                    print(f"[Vision Step Error]: {e}")
+                    # We continue the loop on minor step errors unless it's critical
+                    if self.step_count >= current_max_steps:
+                         raise e
+
+        except Exception as e:
+            print(f"[Vision] Critical Error: {e}")
+            return f"Task Failed: {e}"
         
+        finally:
+            set_task_active(self.session_id, False)
+            
         return "Max steps reached (Dynamic limit)."
