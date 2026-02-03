@@ -172,29 +172,59 @@ def check_system_dependencies():
     except Exception as e:
         console.print(f"[yellow]⚠ Error checking Node.js: {e}[/yellow]")
     
+    # 1.1 Check Homebrew (macOS Only)
+    if platform.system() == "Darwin":
+        try:
+            subprocess.run(["brew", "--version"], capture_output=True, text=True, check=True)
+            console.print("[green]✓ Homebrew found[/green]")
+        except:
+            console.print("[yellow]⚠ Homebrew NOT found. Recommended for macOS: https://brew.sh[/yellow]")
+    
     # 2. Check Python Vision Libraries
     vision_ok = True
+    system = platform.system()
+    is_mac = system == "Darwin"
+    is_silicon = is_mac and platform.machine() == "arm64"
+    
+    if is_mac:
+        console.print(f"[cyan] Detected macOS{' (Apple Silicon)' if is_silicon else ''}[/cyan]")
+        
     try:
-        # Wrap import in case it tries to connect to display immediately
-        import pyautogui
         import PIL
-        # Some Linux systems will fail on the first call
+        import pyautogui
+        
+        # Verify display access/Permissions
         try:
-             pyautogui.size()
-             console.print("[green]✓ Vision dependencies found and display connected[/green]")
+             width, height = pyautogui.size()
+             console.print(f"[green]✓ Vision dependencies found (Display: {width}x{height})[/green]")
+             if is_mac and width < 100: # Heuristic for denied permissions
+                 console.print("[red]⚠ macOS Permission Error: Display size reported as too small.[/red]")
+                 raise Exception("Display permissions likely denied")
         except Exception as e:
-             console.print(f"[yellow]⚠ Vision libraries found, but Display Error: {e}[/yellow]")
-             console.print("[dim]Note: This is normal on headless servers or VMs without X11 setup.[/dim]")
+             console.print(f"[yellow]⚠ Vision Display Error: {e}[/yellow]")
+             if is_mac:
+                 console.print("\n[bold red]CRITICAL: macOS Permissions Required[/bold red]")
+                 console.print("LiteClaw needs [bold]Screen Recording[/bold] and [bold]Accessibility[/bold] permissions.")
+                 console.print("1. Open [bold]System Settings > Privacy & Security[/bold]")
+                 console.print("2. Grant permissions to your [bold]Terminal/IDE[/bold] and [bold]Python[/bold].")
+                 console.print("3. Restart your Terminal after granting.")
+             else:
+                 console.print("[dim]Note: This is normal on headless servers or VMs without X11 setup.[/dim]")
              vision_ok = False
-    except ImportError:
-        console.print("[yellow]⚠ Vision dependencies missing. Desktop automation will be limited.[/yellow]")
-        console.print("[dim]Run: pip install pyautogui Pillow[/dim]")
+    except ImportError as e:
+        missing = str(e).split("'")[-2]
+        console.print(f"[yellow]⚠ Missing dependency: {missing}[/yellow]")
+        if is_mac:
+            console.print("[yellow]For macOS Vision support, run:[/yellow]")
+            console.print("[bold]pip install pyautogui Pillow pyobjc-core pyobjc-framework-Quartz[/bold]")
+        else:
+            console.print("[yellow]Run: pip install pyautogui Pillow[/yellow]")
         vision_ok = False
     except Exception as e:
         console.print(f"[yellow]⚠ Vision init error: {e}[/yellow]")
         vision_ok = False
         
-    return node_ok
+    return node_ok, vision_ok
 
 def setup_llm(current_config=None):
     console.print("\n[bold]1. LLM Provider Setup[/bold]")
@@ -682,7 +712,7 @@ def onboarding():
     clear_screen()
     console.print(Panel.fit("[bold cyan]🦞 LiteClaw - Adaptive AI Gateway[/bold cyan]\n[dim]Onboarding Wizard[/dim]", border_style="cyan"))
     
-    check_system_dependencies()
+    node_ok, vision_ok = check_system_dependencies()
     
     # Check for existing config to preload
     current_config = {}

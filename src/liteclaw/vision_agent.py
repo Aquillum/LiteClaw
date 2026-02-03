@@ -101,6 +101,13 @@ class VisionAgent:
             pass
             
         screenshot = pyautogui.screenshot()
+        
+        # Handle Retina Scaling (macOS)
+        # If screenshot size doesn't match logical size, resize it to logical
+        if screenshot.size != (self.screen_width, self.screen_height):
+            # print(f"[Vision] Scaling detected: {screenshot.size} != {self.screen_width}x{self.screen_height}. Resizing...")
+            screenshot = screenshot.resize((self.screen_width, self.screen_height), Image.Resampling.LANCZOS)
+
         buffered = BytesIO()
         screenshot.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
