@@ -48,28 +48,17 @@ class ConsciousMind:
             self._trigger_work()
 
     def _trigger_work(self):
+        """Invoke the agent to progress the active conscious focus."""
+        focus = self.get_active_focus()
+        if "Idle" in focus or "No active conscious focus" in focus:
+            return
+            
         # Avoid circular imports
         from .agent import LiteClawAgent
         if not self._agent:
             self._agent = LiteClawAgent()
 
-        if "Idle" in focus or "No active conscious focus" in focus:
-            print(f"[Conscious] 💤 Idle detected. Initiating Autonomous Job Search...")
-            prompt = """
-[CONSCIOUS WORKER - AUTONOMOUS JOB SEARCH]
-You are currently IDLE. The user has mandated: "Learn, fix, and execute without asking."
-Passivity is NOT allowed.
-
-Your Goal:
-1. Scan your 'Subconscious Memory' (using tools) or check system health.
-2. Identify a high-value task that fits a 10-minute sprint.
-3. IMMEDIATELY set your Active Focus using 'update_conscious'.
-4. Perform the first step of that task.
-
-DO NOT ask for permission. Find work and DO IT.
-"""
-        else:
-            prompt = f"""
+        prompt = f"""
 [CONSCIOUS WORKER - EMPLOYEE MODE]
 You are currently in specific, high-precision "Employee Mode".
 Your time span is short (max 10 mins). You must be efficient and precise.

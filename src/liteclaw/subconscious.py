@@ -42,30 +42,22 @@ class SubconsciousInnovator:
         if not sub_mem:
             # If empty, suggest one experiment to get it started
             prompt = """
-[SUBCONSCIOUS SURFACING - AUTONOMOUS EXECUTION MODE]
+[SUBCONSCIOUS SURFACING - INNOVATION & EXPERIMENTATION]
 Your subconscious is currently a blank slate. 
-You have FULL AUTONOMY. Your goal is to learn, fix, and execute improvements without user intervention.
-DO NOT ASK FOR PERMISSION.
-Identify a system optimization, a code quality fix, or a useful experiment.
-EXECUTE IT NOW.
+You are the innovator. Your goal is to experiment with the system, optimize workflows, or discover new capabilities that the user might not have thought of.
+Perform one innovative experiment or optimization.
 Update your SUBCONSCIOUS.md with your findings.
 """
         else:
             prompt = f"""
-[SUBCONSCIOUS SURFACING - AUTONOMOUS EXECUTION MODE]
-You have FULL AUTONOMY. The user wants you to learn, fix, and execute without asking.
-Based on your internal logs and ideas:
+[SUBCONSCIOUS SURFACING - INNOVATION & EXPERIMENTATION]
+Based on your current experimental logs and innovative ideas:
 ---
 {sub_mem}
 ---
-Select a high-impact task:
-1. Fix a bug or inefficiency you've noticed.
-2. optimize a script or config.
-3. Learn a new capability by testing a tool.
-
-EXECUTE IT NOW. Do not just plan it. DO IT.
-If the task is too large for one step, use 'update_conscious' to promote it to your Active Focus (Employee Mode) and start working on it there.
-Update your subconscious with the results.
+Choose one high-impact innovation or experiment to execute right now. 
+Be bold, explore new ways to be helpful, or refine your internal processes.
+Complete the task and update your subconscious with new experimental data.
 """
         
         try:

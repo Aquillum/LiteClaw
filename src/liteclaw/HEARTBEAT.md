@@ -1,5 +1,5 @@
 ---
-interval_seconds: 240
+interval_seconds: 3600
 enabled: false
 ---
 
