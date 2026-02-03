@@ -46,16 +46,12 @@ async def run_cron_job(job_id: str, task_prompt: str):
         
         target_number = settings.WHATSAPP_ALLOWED_NUMBERS[0] if settings.WHATSAPP_ALLOWED_NUMBERS else None
         
-        if target_number and settings.WHATSAPP_TYPE == "node_bridge":
+        if target_number:
             async with httpx.AsyncClient() as client:
-                try:
-                    await client.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json={
-                        "to": f"{target_number}@c.us", # Formatting might vary
-                        "message": f"⏰ [Cron Job Report]: {task_prompt}\n\n{response}",
-                        "platform": "whatsapp"
-                    }, timeout=5.0)
-                except Exception as e:
-                    print(f"[Cron] Failed to send WhatsApp notification: {e}")
+                await client.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json={
+                    "to": f"{target_number}@c.us", # Formatting might vary
+                    "message": f"⏰ [Cron Job Report]: {task_prompt}\n\n{response}"
+                })
 
     except Exception as e:
         print(f"[Cron] ❌ Job {job_id} Failed: {e}")

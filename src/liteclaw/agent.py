@@ -471,8 +471,6 @@ class LiteClawAgent:
                                 try:
                                     import asyncio
                                     async def notify_user():
-                                        if platform not in ["whatsapp", "telegram", "slack"]:
-                                            return
                                         async with httpx.AsyncClient(timeout=10.0) as client:
                                             await client.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json={
                                                 "to": session_id,
@@ -575,12 +573,6 @@ class LiteClawAgent:
                                 media_type = func_args.get('type')
                                 
                                 yield f">>> [Media]: Sending {media_type}...\n"
-                                
-                                if platform not in ["whatsapp", "telegram", "slack"]:
-                                    tool_output = f"Skipping bridge notification for platform: {platform}. Media saved locally if applicable."
-                                    yield f">>> [Media Result]: {tool_output}\n"
-                                    continue
-
                                 from .main import WHATSAPP_BRIDGE_URL
                                 import requests
                                 
@@ -622,12 +614,6 @@ class LiteClawAgent:
 
                             elif func_name == "search_and_send_gif":
                                 yield f">>> [GIF]: Searching for '{func_args.get('query')}'...\n"
-                                
-                                if platform not in ["whatsapp", "telegram", "slack"]:
-                                    tool_output = f"Skipping GIF send via bridge for platform: {platform}."
-                                    yield f">>> [GIF Result]: {tool_output}\n"
-                                    continue
-
                                 from .main import WHATSAPP_BRIDGE_URL
                                 import requests
                                 import random

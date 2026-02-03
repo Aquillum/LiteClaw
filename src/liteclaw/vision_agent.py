@@ -285,16 +285,11 @@ Do not return markdown code blocks. Just the raw JSON string.
         return f"Unknown action: {action_type}"
 
     def _send_screenshot_to_user(self, image: Any, caption: str):
-        """Save and send screenshot via bridge (only if a bridge platform is active)."""
+        """Save and send screenshot via bridge."""
         filename = f"vision_{uuid.uuid4().hex[:8]}.png"
         path = os.path.join(self.screenshot_dir, filename)
         image.save(path)
         
-        # Only attempt bridge send if we are on a bridge platform
-        if self.platform not in ["whatsapp", "telegram", "slack"]:
-            # print(f"[Vision] Screenshot saved locally: {path} (Skipping bridge for platform: {self.platform})")
-            return
-
         try:
             from .main import WHATSAPP_BRIDGE_URL
             import requests
@@ -307,9 +302,9 @@ Do not return markdown code blocks. Just the raw JSON string.
                 "caption": caption,
                 "is_media": True,
                 "platform": self.platform
-            }, timeout=5)
+            })
         except Exception as e:
-            print(f"Failed to send screenshot via bridge: {e}")
+            print(f"Failed to send screenshot: {e}")
 
     def save_debug_artifact(self, image: Any, bbox: List[int], point: Tuple[int, int]):
         """Save debug artifact with bounding box and target point."""
