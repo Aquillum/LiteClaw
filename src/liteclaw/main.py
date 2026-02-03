@@ -24,10 +24,6 @@ async def startup_event():
     # Start Subconscious Innovator
     from .subconscious import subconscious_innovator
     subconscious_innovator.start()
-    
-    # Start Conscious Worker
-    from .conscious import conscious_mind
-    conscious_mind.start()
 
 class CreateSessionRequest(BaseModel):
     session_id: Optional[str] = None
@@ -166,27 +162,6 @@ async def handle_whatsapp_incoming(request: Request):
             print(f"[Browser] ✅ Received answer to pending question: {message}")
         
         return {"status": "browser_question_answered"}
-
-    # PRIORITY CHECK #1.5: Steering an active vision or sub-agent task
-    from .browser_utils import is_task_active, set_interjection
-    if is_task_active(session_id) and not from_me:
-        # Capture as an interjection
-        set_interjection(session_id, message)
-        
-        if not from_me:
-            async with httpx.AsyncClient() as client:
-                try:
-                    await client.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json={
-                        "to": sender,
-                        "message": f"[LiteClaw] ⚡ **Steering update received!**\n\nI've injected your new instructions into the running task. I will adapt in the next step.\n\nInstructions: \"{message}\"",
-                        "platform": platform
-                    })
-                except:
-                    pass
-        else:
-            print(f"[Steering] ✅ Registered interjection for {session_id}: {message}")
-            
-        return {"status": "task_steering_updated"}
 
     # PRIORITY CHECK #2: Loop Prevention for LiteClaw messages
     if "[LiteClaw]" in message:

@@ -22,13 +22,15 @@ class SubconsciousInnovator:
 
     def _loop(self):
         # Initial sleep to let the system stabilize
-        time.sleep(30)
+        time.sleep(60)
         
         while self._running:
-            # Surfacing happens every 5 to 15 minutes as requested
-            wait_time = random.randint(300, 900) 
+            # Random wait between 2 to 6 hours for 'subconscious surfacing'
+            # For testing/demo, we can make it shorter (e.g., 30-60 mins)
+            # wait_time = random.randint(7200, 21600)
+            wait_time = random.randint(1800, 3600) # 30-60 mins for higher activity
             
-            print(f"[Subconscious] Next innovative surge scheduled in {wait_time//60} mins {wait_time%60} secs.")
+            print(f"[Subconscious] Next insight scheduled in {wait_time//60} mins.")
             time.sleep(wait_time)
             
             if not self._running:
@@ -42,22 +44,20 @@ class SubconsciousInnovator:
         if not sub_mem:
             # If empty, suggest one experiment to get it started
             prompt = """
-[SUBCONSCIOUS SURFACING - INNOVATION & EXPERIMENTATION]
-Your subconscious is currently a blank slate. 
-You are the innovator. Your goal is to experiment with the system, optimize workflows, or discover new capabilities that the user might not have thought of.
-Perform one innovative experiment or optimization.
-Update your SUBCONSCIOUS.md with your findings.
+[SUBCONSCIOUS SURFACING]
+Your subconscious is empty. It's time to innovate. 
+Perform one small experiment or optimization on the host computer that could help the user or improve your efficiency.
+Update your SUBCONSCIOUS.md with the result.
 """
         else:
             prompt = f"""
-[SUBCONSCIOUS SURFACING - INNOVATION & EXPERIMENTATION]
-Based on your current experimental logs and innovative ideas:
+[SUBCONSCIOUS SURFACING]
+Based on your current subconscious memory:
 ---
 {sub_mem}
 ---
-Choose one high-impact innovation or experiment to execute right now. 
-Be bold, explore new ways to be helpful, or refine your internal processes.
-Complete the task and update your subconscious with new experimental data.
+Choose one innovation, lesson, or experiment to act upon right now. 
+Complete the task and update your subconscious with new findings.
 """
         
         try:
