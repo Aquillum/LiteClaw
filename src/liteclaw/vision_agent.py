@@ -6,6 +6,8 @@ import sys
 import uuid
 from io import BytesIO
 from typing import Optional, Dict, Any, List, Tuple
+from collections import deque
+import threading
 from .config import settings
 
 # Third-party imports
@@ -61,8 +63,23 @@ class VisionAgent:
             self.screen_width, self.screen_height = (1920, 1080) # Fallback if headless/error
             
         # Ensure screenshot dir exists
+        # Ensure screenshot dir exists
         self.screenshot_dir = settings.get_screenshots_dir()
         os.makedirs(self.screenshot_dir, exist_ok=True)
+        
+        # Singleton Queue Logic
+        self.goal_queue = deque()
+        if goal:
+            self.goal_queue.append(goal)
+            
+        self.is_running = True
+        self.current_goal = None
+
+    def add_goal(self, goal: str):
+        """Inject a new goal into the active agent."""
+        if goal:
+            self.goal_queue.append(goal)
+            print(f"[Vision] New goal injected into queue: {goal}")
 
     def capture_screen(self) -> Tuple[Any, str]:
         """Captures screen, returns PIL Image and base64 string."""
@@ -157,8 +174,8 @@ Do not return markdown code blocks. Just the raw JSON string.
                 ymin, xmin, ymax, xmax = bbox
                 center_x_norm = (xmin + xmax) / 2
                 center_y_norm = (ymin + ymax) / 2
-                target_x = int(round((center_x_norm / 1000) * self.screen_width))
-                target_y = int(round((center_y_norm / 1000) * self.screen_height))
+                target_x = (center_x_norm / 1000) * self.screen_width
+                target_y = (center_y_norm / 1000) * self.screen_height
                 
                 # Visual Debug
                 self.save_debug_artifact(screenshot, bbox, (target_x, target_y))
@@ -175,8 +192,8 @@ Do not return markdown code blocks. Just the raw JSON string.
                 ymin, xmin, ymax, xmax = bbox
                 center_x_norm = (xmin + xmax) / 2
                 center_y_norm = (ymin + ymax) / 2
-                target_x = int(round((center_x_norm / 1000) * self.screen_width))
-                target_y = int(round((center_y_norm / 1000) * self.screen_height))
+                target_x = (center_x_norm / 1000) * self.screen_width
+                target_y = (center_y_norm / 1000) * self.screen_height
                 
                 # Visual Debug
                 self.save_debug_artifact(screenshot, bbox, (target_x, target_y))
@@ -193,8 +210,8 @@ Do not return markdown code blocks. Just the raw JSON string.
                 ymin, xmin, ymax, xmax = bbox
                 center_x_norm = (xmin + xmax) / 2
                 center_y_norm = (ymin + ymax) / 2
-                target_x = int(round((center_x_norm / 1000) * self.screen_width))
-                target_y = int(round((center_y_norm / 1000) * self.screen_height))
+                target_x = (center_x_norm / 1000) * self.screen_width
+                target_y = (center_y_norm / 1000) * self.screen_height
                 
                 # Visual Debug
                 self.save_debug_artifact(screenshot, bbox, (target_x, target_y))
@@ -235,8 +252,8 @@ Do not return markdown code blocks. Just the raw JSON string.
             point = action_data.get("point")
             if point:
                 px, py = point
-                target_x = int(round((px / 1000) * self.screen_width))
-                target_y = int(round((py / 1000) * self.screen_height))
+                target_x = (px / 1000) * self.screen_width
+                target_y = (py / 1000) * self.screen_height
                 pyautogui.moveTo(target_x, target_y, duration=0.5)
                 return f"Moved cursor to ({target_x}, {target_y})"
             return "Error: MOVE_TO missing point"
@@ -327,67 +344,102 @@ Do not return markdown code blocks. Just the raw JSON string.
             pass
 
     def run(self):
-        print(f"[Vision] Started task: {self.goal}")
+        print(f"[Vision] Agent started. Waiting for goals...")
         
-        current_max_steps = self.max_steps
-        
-        while self.step_count < current_max_steps:
-            self.step_count += 1
-            
-            # Dynamic Extension & Thinking Logic
-            checkpoint_msg = ""
-            if self.step_count % 5 == 0:
-                current_max_steps += 5 # Dynamic extension based on user rule
-                checkpoint_msg = f"\n\n[SYSTEM] Checkpoint (Step {self.step_count}): Review your progress. Start planning the next phase. Session extended."
-                print(f"[Vision] Step {self.step_count}: Dynamic extension applied. New limit: {current_max_steps}")
-            
-            # 1. Capture
-            screenshot, b64_img = self.capture_screen()
-            
-            # 2. Think
-            try:
-                user_content_str = f"GOAL: {self.goal}\n\nHistory: {self.history}{checkpoint_msg}"
-                
-                messages = [
-                    {"role": "system", "content": self.get_system_prompt()},
-                    {
-                        "role": "user", 
-                        "content": [
-                            {"type": "text", "text": user_content_str},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64_img}"}}
-                        ]
-                    }
-                ]
-                
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages
-                )
-                
-                content = response.choices[0].message.content
-                action_data = self.parse_response(content)
-                
-                if not action_data:
-                    print("[Vision] Failed to parse response")
-                    continue
-                
-                # 3. Act
-                result_msg = self.execute_action(action_data, screenshot)
-                
-                if result_msg == "FINISH":
-                    final_reason = action_data.get('reason', 'Done')
-                    print(f"[Vision] Finished: {final_reason}")
-                    return f"Task Completed. Reason: {final_reason}\nHistory: {self.history}"
-                
-                # Record History
-                summary = f"Step {self.step_count}: {action_data.get('thought')} -> {action_data.get('action')} => {result_msg}"
-                self.history.append(summary)
-                print(f"[Vision] {summary}")
-                
+        while self.is_running:
+            if not self.goal_queue:
                 time.sleep(1)
-
-            except Exception as e:
-                print(f"[Vision] Error: {e}")
-                return f"Task Failed: {e}"
+                continue
+                
+            # Pick next goal
+            self.current_goal = self.goal_queue.popleft()
+            self.goal = self.current_goal # Update for system prompt context
+            self.step_count = 0
+            self.history = [] # Reset history for new goal? Or keep context? 
+            # User said "all subagents will be a single entity", implying shared context?
+            # But "injected new prompt" usually means a distinct task. 
+            # Let's clean history to avoid context window explosion, but maybe keep last summary?
+            # For now, clean slate per goal is safer.
+            
+            print(f"[Vision] 🟢 Starting goal: {self.current_goal}")
+            
+            current_max_steps = self.max_steps
+            goal_completed = False
+            
+            while self.step_count < current_max_steps and not goal_completed:
+                self.step_count += 1
+                
+                # AGI-Reflection Loop (Every 5 steps)
+                checkpoint_msg = ""
+                if self.step_count > 0 and self.step_count % 5 == 0:
+                    print(f"[Vision] Step {self.step_count}: Entering REFLECTION phase...")
+                    time.sleep(2) 
+                    checkpoint_msg = (
+                        f"\n\n[SYSTEM CHECKPOINT - Step {self.step_count}]"
+                        f"\nSTOP. You have executed 5 steps."
+                        f"\n1. REFLECT: Look at your history. Are you closer to the goal?"
+                        f"\n2. ANALYZE: If you failed any steps, why?"
+                        f"\n3. PLAN: What are the next 5 steps?"
+                        f"\n4. ADJUST: If stuck, try a completely different approach."
+                        f"\nSession limit auto-extended."
+                    )
+                    current_max_steps += 5
+                    print(f"[Vision] Session extended. New limit: {current_max_steps}")
+                
+                # Check if new high-priority goal injected? (Not implementing priority yet, just FIFO)
+                
+                # 1. Capture
+                screenshot, b64_img = self.capture_screen()
+                
+                # 2. Think
+                try:
+                    user_content_str = f"GOAL: {self.current_goal}\n\nHistory: {self.history}{checkpoint_msg}"
+                    
+                    messages = [
+                        {"role": "system", "content": self.get_system_prompt()},
+                        {
+                            "role": "user", 
+                            "content": [
+                                {"type": "text", "text": user_content_str},
+                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64_img}"}}
+                            ]
+                        }
+                    ]
+                    
+                    response = self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=messages
+                    )
+                    
+                    content = response.choices[0].message.content
+                    action_data = self.parse_response(content)
+                    
+                    if not action_data:
+                        print("[Vision] Failed to parse response")
+                        continue
+                    
+                    # 3. Act
+                    result_msg = self.execute_action(action_data, screenshot)
+                    
+                    if result_msg == "FINISH":
+                        final_reason = action_data.get('reason', 'Done')
+                        print(f"[Vision] 🏁 Finished goal '{self.current_goal}': {final_reason}")
+                        goal_completed = True
+                        break # Break inner loop, go back to queue
+                    
+                    # Record History
+                    summary = f"Step {self.step_count}: {action_data.get('thought')} -> {action_data.get('action')} => {result_msg}"
+                    self.history.append(summary)
+                    print(f"[Vision] {summary}")
+                    
+                    time.sleep(1)
+    
+                except Exception as e:
+                    print(f"[Vision] Error executing goal '{self.current_goal}': {e}")
+                    goal_completed = True # Stop this goal on error
+                    break
+            
+            if not goal_completed:
+                 print(f"[Vision] ⚠️ Goal '{self.current_goal}' stopped (Max steps reached).")
         
-        return "Max steps reached (Dynamic limit)."
+        print("[Vision] Agent stopped.")
