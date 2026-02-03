@@ -105,7 +105,7 @@ You must output a JSON object describing the next action to take.
    - Required fields: "keys" (list of strings, e.g. ["ctrl", "c"], ["enter"], ["win"])
 6. **SCROLL**: Scroll the mouse wheel.
    - Required fields: "direction" ("up" | "down"), "amount" (integer).
-   - Tip: Use amount=1 or 2 for precise reading (bit-by-bit). Use 5+ for fast navigation.
+   - Tip: "amount" is number of mouse clicks. 1 = small step. 5 = medium.
 7. **MOVE_TO**: Move the mouse without clicking.
    - Required fields: "point" ([x, y] normalized 0-1000)
 8. **WAIT**: Wait for a few seconds.
@@ -218,15 +218,18 @@ Do not return markdown code blocks. Just the raw JSON string.
         elif action_type == "SCROLL":
             direction = action_data.get("direction", "down")
             amount = action_data.get("amount", 3)
-            # Smooth scroll implementation to prevent "hard" jumps
-            # Scrolls bit-by-bit (1 click = 120 units) with delays
+            # Smooth scroll implementation
+            # User reported 1 unit = bottom of page with previous 120 multiplier.
+            # Hypothesis: On this machine, scroll value is interpreted as 'clicks', not 'units'.
+            # We will use 1 as the base unit per step.
             clicks = amount
             for _ in range(clicks):
-                scroll_cmd = -120 if direction == "down" else 120
+                # Using +/- 1 here assuming the OS interprets this as 1 click/notch
+                scroll_cmd = -1 if direction == "down" else 1
                 pyautogui.scroll(scroll_cmd)
-                time.sleep(0.1) # Small delay for smooth visual and app response
+                time.sleep(0.1) 
             
-            return f"Scrolled {direction} by {clicks} clicks (bit-by-bit)"
+            return f"Scrolled {direction} by {clicks} steps"
 
         elif action_type == "MOVE_TO":
             point = action_data.get("point")
