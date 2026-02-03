@@ -59,8 +59,8 @@ loadConfigs();
 
 let client = null;
 
-if (WHATSAPP_TYPE === 'node_bridge' || (!TELEGRAM_TOKEN && !SLACK_BOT_TOKEN)) {
-    console.log(`[Bridge] Initializing WhatsApp Client (Type: ${WHATSAPP_TYPE || 'default'})...`);
+if (WHATSAPP_TYPE === 'node_bridge') {
+    console.log(`[Bridge] Initializing WhatsApp Client (Type: node_bridge)...`);
 
     // 1. Setup WhatsApp Session Path in WORK_DIR
     const sessionDataPath = path.join(WORK_DIR, 'sessions', 'whatsapp');
@@ -266,7 +266,6 @@ app.post('/whatsapp/send', async (req, res) => {
             if (!global.telegramBot) throw new Error("Telegram bot not initialized");
 
             if (is_media) {
-                // For local files, we must use fs.createReadStream to ensure reliable delivery
                 let mediaSource = url_or_path;
                 if (fs.existsSync(url_or_path)) {
                     mediaSource = fs.createReadStream(url_or_path);
@@ -275,7 +274,6 @@ app.post('/whatsapp/send', async (req, res) => {
                 if (type === 'image') {
                     await global.telegramBot.sendPhoto(to, mediaSource, { caption: caption });
                 } else if (type === 'gif') {
-                    // GIFs are best sent as animations in Telegram
                     await global.telegramBot.sendAnimation(to, mediaSource, { caption: caption });
                 } else if (type === 'video') {
                     await global.telegramBot.sendVideo(to, mediaSource, { caption: caption });
@@ -288,8 +286,8 @@ app.post('/whatsapp/send', async (req, res) => {
                 await global.telegramBot.sendMessage(to, message);
             }
             return res.json({ success: true, platform: 'telegram' });
-        }
-        if (platform === 'slack') {
+
+        } else if (platform === 'slack') {
             if (!SLACK_BOT_TOKEN) throw new Error("SLACK_BOT_TOKEN not initialized");
 
             let text = message;
@@ -297,7 +295,6 @@ app.post('/whatsapp/send', async (req, res) => {
                 text = `${caption || ''}\n${url_or_path}`;
             }
 
-            // Use Bolt app client if available, fallback to axios
             if (global.slackApp) {
                 const result = await global.slackApp.client.chat.postMessage({
                     channel: to,
@@ -316,47 +313,44 @@ app.post('/whatsapp/send', async (req, res) => {
                 if (!response.data.ok) throw new Error(response.data.error);
                 return res.json({ success: true, platform: 'slack' });
             }
-        }
 
-        // --- WhatsApp Logic ---
-        // Check if client is ready before attempting to send
-        if (!client || !client.info) {
-            throw new Error("WhatsApp client not ready yet. Please wait for initialization.");
-        }
-
-        // Sanitize message to avoid Puppeteer evaluation issues
-        // The "t: t" error is often caused by special characters in the browser context
-        let sanitizedMessage = message;
-        if (message) {
-            // Replace potentially problematic characters with safe alternatives
-            sanitizedMessage = message
-                .replace(/₹/g, 'Rs.')      // Rupee symbol -> Rs.
-                .replace(/€/g, 'EUR')       // Euro
-                .replace(/£/g, 'GBP')       // Pound
-                .replace(/¥/g, 'JPY')       // Yen
-                .replace(/\u00A0/g, ' ')    // Non-breaking space
-                .replace(/[\u2018\u2019]/g, "'")  // Smart quotes
-                .replace(/[\u201C\u201D]/g, '"')  // Smart double quotes
-                .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ''); // Control chars
-        }
-
-        if (is_media) {
-            let media;
-            if (url_or_path.startsWith('http')) {
-                media = await MessageMedia.fromUrl(url_or_path);
-            } else {
-                // Local file
-                media = MessageMedia.fromFilePath(url_or_path);
+        } else if (platform === 'whatsapp') {
+            if (!client || !client.info) {
+                throw new Error("WhatsApp client not ready yet. Please wait for initialization.");
             }
-            const response = await client.sendMessage(to, media, { caption: caption });
-            return res.json({ success: true, id: response.id._serialized, platform: 'whatsapp' });
+
+            let sanitizedMessage = message;
+            if (message) {
+                sanitizedMessage = message
+                    .replace(/₹/g, 'Rs.')
+                    .replace(/€/g, 'EUR')
+                    .replace(/£/g, 'GBP')
+                    .replace(/¥/g, 'JPY')
+                    .replace(/\u00A0/g, ' ')
+                    .replace(/[\u2018\u2019]/g, "'")
+                    .replace(/[\u201C\u201D]/g, '"')
+                    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+            }
+
+            if (is_media) {
+                let media;
+                if (url_or_path.startsWith('http')) {
+                    media = await MessageMedia.fromUrl(url_or_path);
+                } else {
+                    media = MessageMedia.fromFilePath(url_or_path);
+                }
+                const response = await client.sendMessage(to, media, { caption: caption });
+                return res.json({ success: true, id: response.id._serialized, platform: 'whatsapp' });
+            } else {
+                const response = await client.sendMessage(to, sanitizedMessage);
+                return res.json({ success: true, id: response.id._serialized, platform: 'whatsapp' });
+            }
+
         } else {
-            const response = await client.sendMessage(to, sanitizedMessage);
-            return res.json({ success: true, id: response.id._serialized, platform: 'whatsapp' });
+            return res.status(400).json({ error: `Platform '${platform || 'default'}' is not supported or not configured on this bridge.` });
         }
     } catch (error) {
         console.error(`Error sending message/media (${platform || 'whatsapp'}):`, error);
-        // Return full error details for better debugging
         res.status(500).json({
             success: false,
             error: error.message || error.toString(),

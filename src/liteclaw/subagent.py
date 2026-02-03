@@ -71,10 +71,15 @@ class SubAgent:
         final_text = f"✅ [Sub-Agent '{self.name}' Complete]:\n{message}"
         print(f"[Sub-Agent] Sending completion to {self.session_id} via {self.platform.title()}")
 
-        # Skip for API platform (no push notifications)
-        if self.platform == "api":
-            print(f"[Sub-Agent] API platform - completion message logged only: {final_text[:100]}...")
+        # Skip for non-bridge platforms or when bridge isn't configured
+        if self.platform in ["api", "subconscious"]:
+            print(f"[Sub-Agent] {self.platform.title()} platform - completion message logged only: {final_text[:100]}...")
             return
+
+        from .config import settings
+        if self.platform == "whatsapp" and settings.WHATSAPP_TYPE != "node_bridge":
+             print(f"[Sub-Agent] WhatsApp bridge is not active (Type: {settings.WHATSAPP_TYPE}) - skipping notification.")
+             return
 
         try:
             # All platforms use the same endpoint - routing is based on "platform" field
