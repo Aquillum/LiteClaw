@@ -4,6 +4,7 @@ import os
 import time
 import sys
 import uuid
+import requests
 from io import BytesIO
 from typing import Optional, Dict, Any, List, Tuple
 from collections import deque
@@ -343,6 +344,34 @@ Do not return markdown code blocks. Just the raw JSON string.
         except Exception:
             pass
 
+    def _notify_main_session(self, message: str):
+        """Send a notification message back to the main session via bridge."""
+        from .main import WHATSAPP_BRIDGE_URL
+        
+        # Truncate if too long for messaging platforms
+        if len(message) > 1500:
+            message = message[:1500] + "...[truncated]"
+            
+        final_text = f"👁️ [Vision Agent]: {message}"
+        print(f"[Vision] Sending notification to {self.session_id}: {message[:50]}...")
+        
+        try:
+            requests.post(f"{WHATSAPP_BRIDGE_URL}/whatsapp/send", json={
+                "to": self.session_id,
+                "message": final_text,
+                "platform": self.platform
+            })
+            
+            # Also attempt to persist in conversation history for the session agent
+            try:
+                from .memory import add_message
+                add_message(self.session_id, {"role": "system", "content": final_text})
+            except Exception as me:
+                print(f"[Vision] Failed to update memory: {me}")
+                
+        except Exception as e:
+            print(f"[Vision] Failed to send notification: {e}")
+
     def run(self):
         print(f"[Vision] Agent started. Waiting for goals...")
         
@@ -424,6 +453,7 @@ Do not return markdown code blocks. Just the raw JSON string.
                     if result_msg == "FINISH":
                         final_reason = action_data.get('reason', 'Done')
                         print(f"[Vision] 🏁 Finished goal '{self.current_goal}': {final_reason}")
+                        self._notify_main_session(f"✅ Goal Completed: {self.current_goal}\nResult: {final_reason}")
                         goal_completed = True
                         break # Break inner loop, go back to queue
                     
@@ -435,11 +465,15 @@ Do not return markdown code blocks. Just the raw JSON string.
                     time.sleep(1)
     
                 except Exception as e:
-                    print(f"[Vision] Error executing goal '{self.current_goal}': {e}")
+                    error_msg = f"Error executing goal '{self.current_goal}': {e}"
+                    print(f"[Vision] {error_msg}")
+                    self._notify_main_session(f"❌ {error_msg}")
                     goal_completed = True # Stop this goal on error
                     break
             
             if not goal_completed:
-                 print(f"[Vision] ⚠️ Goal '{self.current_goal}' stopped (Max steps reached).")
+                 stop_msg = f"⚠️ Goal '{self.current_goal}' stopped (Max steps reached)."
+                 print(f"[Vision] {stop_msg}")
+                 self._notify_main_session(stop_msg)
         
         print("[Vision] Agent stopped.")

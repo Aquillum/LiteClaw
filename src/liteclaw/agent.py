@@ -209,6 +209,21 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "message_sub_agent",
+            "description": "Send a message or instruction to another active sub-agent (including the Vision agent).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sub_agent_name": {"type": "string", "description": "Name of the target sub-agent or 'vision'."},
+                    "message": {"type": "string", "description": "The message or new goal to send."}
+                },
+                "required": ["sub_agent_name", "message"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "kill_all_sub_agents",
             "description": "Terminate all active sub-agents in the current session.",
             "parameters": {"type": "object", "properties": {}}
@@ -531,6 +546,16 @@ class LiteClawAgent:
                                 tool_output = sub_agent_manager.kill_sub_agent(session_id, sub_agent_name)
                                 yield f">>> [Result]: {tool_output}\n"
                             
+                            elif func_name == "message_sub_agent":
+                                from .subagent import sub_agent_manager
+                                sub_agent_name = func_args.get("sub_agent_name")
+                                text = func_args.get("message")
+                                # Identify sender
+                                sender = getattr(self, "name", "Session Agent")
+                                yield f">>> [Comm]: Sending message to '{sub_agent_name}'...\n"
+                                tool_output = sub_agent_manager.message_sub_agent(session_id, sub_agent_name, sender, text)
+                                yield f">>> [Result]: {tool_output}\n"
+
                             elif func_name == "kill_all_sub_agents":
                                 from .subagent import sub_agent_manager
                                 yield f">>> [Sub-Agent]: Terminating all sub-agents...\n"

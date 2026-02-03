@@ -20,6 +20,7 @@ class SubAgent:
         self.status = "idle"  # idle, working, completed, failed
         self.last_result = None
         self.task_history = []
+        self.message_queue = []
         self._thread = None
         self._agent = LiteClawAgent()
 
@@ -59,6 +60,16 @@ class SubAgent:
 
         self._thread = threading.Thread(target=_task_wrapper)
         self._thread.start()
+
+    def receive_message(self, sender: str, text: str):
+        """Receive a message from another agent or session."""
+        msg = f"FROM {sender}: {text}"
+        self.message_queue.append({"sender": sender, "text": text, "time": time.time()})
+        print(f"[Sub-Agent] '{self.name}' received message from {sender}: {text[:50]}...")
+        
+        # Inject into agent history if possible
+        from .memory import add_message
+        add_message(f"subagent-{self.sub_agent_id}", {"role": "user", "content": f"[INCOMING MESSAGE] {msg}"})
 
     async def _notify_completion_async(self, message: str):
         """Notification bridge back to the main user session via the correct platform."""
@@ -149,6 +160,8 @@ class SubAgentManager:
             } for sa in self.sessions[session_id]
         ]
     
+        return f"Error: Sub-agent '{sub_agent_name}' not found."
+
     def kill_sub_agent(self, session_id: str, sub_agent_name: str) -> str:
         """Gracefully terminate a sub-agent by name."""
         if session_id not in self.sessions:
@@ -180,6 +193,25 @@ class SubAgentManager:
                         return f"✅ Sub-agent '{sub_agent_name}' terminated, but browser kill failed: {e}"
                 else:
                     return f"Sub-agent '{sub_agent_name}' is not currently working (status: {sa.status})."
+        
+        return f"Error: Sub-agent '{sub_agent_name}' not found."
+
+    def message_sub_agent(self, session_id: str, sub_agent_name: str, sender: str, text: str) -> str:
+        """Send a message to a specific sub-agent."""
+        if session_id not in self.sessions:
+            return f"Error: No sub-agents found for session {session_id}."
+        
+        for sa in self.sessions[session_id]:
+            if sa.name == sub_agent_name:
+                sa.receive_message(sender, text)
+                return f"Message delivered to '{sub_agent_name}'."
+        
+        # Check if target is 'vision' (special handling)
+        if sub_agent_name.lower() == "vision":
+            from .agent import GLOBAL_VISION_AGENT
+            if GLOBAL_VISION_AGENT and GLOBAL_VISION_AGENT.is_running:
+                GLOBAL_VISION_AGENT.add_goal(f"[MESSAGE FROM {sender}]: {text}")
+                return "Vision Agent received the message as a priority goal."
         
         return f"Error: Sub-agent '{sub_agent_name}' not found."
     
