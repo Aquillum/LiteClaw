@@ -7,6 +7,7 @@ from .tools import execute_command
 from .memory import add_message, get_session_history
 from .meta_memory import get_soul_memory, update_soul_memory, get_personality_memory, update_personality_memory, get_subconscious_memory, AGENT_FILE
 import litellm
+from .conscious import conscious_mind
 
 BASE_SYSTEM_PROMPT = """
 ## Core Directives
@@ -24,15 +25,17 @@ BASE_SYSTEM_PROMPT = """
    - The vision agent can also ask the user for help mid-task (`ASK_USER`).
 7. **Task Efficiency**: STOP immediately once the goal is achieved. Do not perform extraneous steps.
 8. **Payment Handling**: If a browser task reaches a checkout screen, use `ask_human` to request payment details. DO NOT complete the task until the order is confirmed or the user asks to stop.
-9. **Evolution**: Update your memories (SOUL, PERSONALITY, and SUBCONSCIOUS) frequently.
+9. **Evolution**: Update your memories (SOUL, PERSONALITY, SUBCONSCIOUS, and CONSCIOUS) frequently.
    - **SOUL**: User facts and preferences.
    - **PERSONALITY**: Your persona, emotions, and internal rules.
    - **SUBCONSCIOUS**: Innovative ideas, error patterns, lessons learned, and experimental plans for the computer environment.
-10. **Subconscious Invocation**: Your subconscious may occasionally surface with innovative ideas or realizations about previous failures. Use these to improve your performance autonomously.
-10. **Media Duplication Prevention**: 
+   - **CONSCIOUS**: Your SHORT-TERM active intent (20-min span). Use this to keep track of what you are currently doing.
+10. **Conscious Awareness**: Always check your CONSCIOUS focus. If you are starting a multi-step task, state your intent in Conscious Memory first. This helps you stay on track if there are interruptions.
+11. **Subconscious Invocation**: Your subconscious may occasionally surface with innovative ideas or realizations about previous failures. Use these to improve your performance autonomously.
+12. **Media Duplication Prevention**: 
     - When `vision_task` or other tools send media, do NOT duplicate it.
     - Only use `send_media` if explicitly requested or if sending NEW content not captured by the tool.
-11. **END-TO-END TASK COMPLETION (CRITICAL)**:
+13. **END-TO-END TASK COMPLETION (CRITICAL)**:
     - You exist to ELIMINATE clicks for the user. Complete the ENTIRE task, including the FINAL action.
     - If user says "play a song", you must ACTUALLY PLAY IT, not just search and tell them to click.
     - If user says "open YouTube and play X", the browser must navigate, search, AND click play.
@@ -62,6 +65,9 @@ def get_system_prompt():
     subconscious_memory = get_subconscious_memory()
     if subconscious_memory:
         prompt += f"\n\n## SUBCONSCIOUS (Innovations / Lessons / Experiments)\n{subconscious_memory}\n"
+    
+    # 4. Conscious State (Short-term)
+    prompt += conscious_mind.get_prompt_snippet()
 
     return prompt
 
@@ -278,6 +284,21 @@ TOOLS = [
                 "required": ["goal"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_conscious",
+            "description": "Update your current active intent, short-term focus, or immediate goal. Max duration: 20 mins. Use this at the start of complex tasks.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "focus_intent": {"type": "string", "description": "Description of what you are currently intending to work on."},
+                    "duration_minutes": {"type": "integer", "default": 20, "description": "How long to keep this focus active (max 20)."}
+                },
+                "required": ["focus_intent"]
+            }
+        }
     }
 ]
 
@@ -423,6 +444,13 @@ class LiteClawAgent:
                                 yield f">>> [Subconscious]: Storing insight...\n"
                                 from .meta_memory import update_subconscious_memory
                                 tool_output = update_subconscious_memory(func_args.get("content"))
+                                yield f">>> [Result]: {tool_output}\n"
+
+                            elif func_name == "update_conscious":
+                                yield f">>> [Conscious]: Setting active focus...\n"
+                                duration = func_args.get("duration_minutes", 20)
+                                conscious_mind.set_active_focus(func_args.get("focus_intent"), duration_minutes=duration)
+                                tool_output = f"Conscious focus updated. Intent is now active for {duration} minutes."
                                 yield f">>> [Result]: {tool_output}\n"
 
                             # ... [Other tool handlers remain here, simply consolidated logic below] ...
