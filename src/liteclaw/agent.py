@@ -332,7 +332,8 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "goal": {"type": "string", "description": "The goal or instruction for the vision agent."},
-                    "max_steps": {"type": "integer", "default": 40, "description": "Maximum steps allowed."}
+                    "max_steps": {"type": "integer", "default": 40, "description": "Maximum steps allowed."},
+                    "is_correction": {"type": "boolean", "default": false, "description": "If true, this goal is treated as an immediate correction/feedback for the CURRENTLY running task."}
                 },
                 "required": ["goal"]
             }
@@ -649,10 +650,16 @@ class LiteClawAgent:
                                 goal = func_args.get("goal")
                                 
                                 if GLOBAL_VISION_AGENT and GLOBAL_VISION_AGENT.is_running:
-                                    # INJECT GOAL into existing agent
-                                    yield f">>> [Vision]: Agent busy. Injecting goal into active queue...\n"
-                                    GLOBAL_VISION_AGENT.add_goal(goal)
-                                    tool_output = f"Goal '{goal}' queued. Position in queue: {len(GLOBAL_VISION_AGENT.goal_queue)}"
+                                    if func_args.get("is_correction"):
+                                        # IMMEDIATE FEEDBACK
+                                        yield f">>> [Vision]: Injecting immediate correction...\n"
+                                        GLOBAL_VISION_AGENT.add_feedback(goal)
+                                        tool_output = f"Correction injected: '{goal}'"
+                                    else:
+                                        # QUEUE GOAL
+                                        yield f">>> [Vision]: Agent busy. Injecting goal into active queue...\n"
+                                        GLOBAL_VISION_AGENT.add_goal(goal)
+                                        tool_output = f"Goal '{goal}' queued. Position in queue: {len(GLOBAL_VISION_AGENT.goal_queue)}"
                                     yield f">>> [Result]: {tool_output}\n"
                                 else:
                                     # START NEW AGENT

@@ -70,6 +70,7 @@ class VisionAgent:
         
         # Singleton Queue Logic
         self.goal_queue = deque()
+        self.feedback_queue = deque() # Real-time corrections
         if goal:
             self.goal_queue.append(goal)
             
@@ -81,6 +82,12 @@ class VisionAgent:
         if goal:
             self.goal_queue.append(goal)
             print(f"[Vision] New goal injected into queue: {goal}")
+
+    def add_feedback(self, feedback: str):
+        """Inject an immediate correction or feedback into the current task."""
+        if feedback:
+            self.feedback_queue.append(feedback)
+            print(f"[Vision] Feedback/Correction received: {feedback}")
 
     def capture_screen(self) -> Tuple[Any, str]:
         """Captures screen, returns PIL Image and base64 string."""
@@ -398,6 +405,15 @@ Do not return markdown code blocks. Just the raw JSON string.
             while self.step_count < current_max_steps and not goal_completed:
                 self.step_count += 1
                 
+                # Check for Real-time Feedback/Corrections
+                feedback_msg = ""
+                if self.feedback_queue:
+                    print(f"[Vision] Processing {len(self.feedback_queue)} corrections...")
+                    feedback_msg = "\n\n[USER CORRECTION]: "
+                    while self.feedback_queue:
+                        feedback_msg += f"\n- {self.feedback_queue.popleft()}"
+                    feedback_msg += "\n\nPLEASE ADJUST YOUR PLAN ACCORDINGLY."
+
                 # AGI-Reflection Loop (Every 5 steps)
                 checkpoint_msg = ""
                 if self.step_count > 0 and self.step_count % 5 == 0:
@@ -422,7 +438,7 @@ Do not return markdown code blocks. Just the raw JSON string.
                 
                 # 2. Think
                 try:
-                    user_content_str = f"GOAL: {self.current_goal}\n\nHistory: {self.history}{checkpoint_msg}"
+                    user_content_str = f"GOAL: {self.current_goal}\n\nHistory: {self.history}{checkpoint_msg}{feedback_msg}"
                     
                     messages = [
                         {"role": "system", "content": self.get_system_prompt()},
