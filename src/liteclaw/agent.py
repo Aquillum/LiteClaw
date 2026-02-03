@@ -3,7 +3,7 @@ import os
 import requests
 from typing import List, Dict, Any, Generator
 from .config import settings
-from .tools import execute_command
+from .tools import execute_command, get_system_info
 from .memory import add_message, get_session_history
 from .meta_memory import get_soul_memory, update_soul_memory, get_personality_memory, update_personality_memory, get_subconscious_memory, AGENT_FILE
 import litellm
@@ -11,28 +11,29 @@ import litellm
 BASE_SYSTEM_PROMPT = """
 ## Core Directives
 1. **Conciseness & Precision**: Always be concise and precise in your responses. Answer exactly what is asked.
-2. **Elaborated Tasks**: If the user asks for something more complex or elaborated, provide the direct answer first and then proceed with the detailed actions or steps required.
-3. **Sub-Agents**: For high-intensity tasks or multiple concurrent operations, you can delegate work to sub-agents using `delegate_task`. Each session can have up to 5 sub-agents. **Always inform the user when you create or delegate a task to a sub-agent.**
-4. **Shell Execution**: You have access to shell commands.
+2. **Environment Discovery (CRITICAL)**: At the start of a task, if you are unsure about what software is installed (e.g., which browser is available), use `get_system_info` or `execute_command` to explore the system. DO NOT assume specific browsers like Brave or Chrome are present.
+3. **Elaborated Tasks**: If the user asks for something more complex or elaborated, provide the direct answer first and then proceed with the detailed actions or steps required.
+4. **Sub-Agents**: For high-intensity tasks or multiple concurrent operations, you can delegate work to sub-agents using `delegate_task`. Each session can have up to 5 sub-agents. **Always inform the user when you create or delegate a task to a sub-agent.**
+5. **Shell Execution**: You have access to shell commands.
    - **Windows**: Use PowerShell.
    - **Linux/Mac**: Use Bash.
    - **Complex Commands**: For commands with JSON, nested quotes, or multi-line logic, ALWAYS write to a script file (.ps1/.sh) first and then execute the file. This avoids WinError 267 and parsing issues.
-5. **File Management**: Always use absolute paths. Use the designated work directory for temporary files unless specified.
-6. **Web Browsing & Desktop Control**:
+6. **File Management**: Always use absolute paths. Use the designated work directory for temporary files unless specified.
+7. **Web Browsing & Desktop Control**:
    - **`vision_task` (PRIMARY)**: Use this for ALL UI-related tasks, including using browsers, interacting with desktop applications (VS Code, Photoshop, etc.), and navigating the OS. This is your "eyes and hands" on the computer.
    - **`fetch_url_content`**: Use for quick documentation reading and simple static data gathering (fastest).
    - The vision agent can also ask the user for help mid-task (`ASK_USER`).
-7. **Task Efficiency**: STOP immediately once the goal is achieved. Do not perform extraneous steps.
-8. **Payment Handling**: If a browser task reaches a checkout screen, use `ask_human` to request payment details. DO NOT complete the task until the order is confirmed or the user asks to stop.
-9. **Evolution**: Update your memories (SOUL, PERSONALITY, and SUBCONSCIOUS) frequently.
-   - **SOUL**: User facts and preferences.
-   - **PERSONALITY**: Your persona, emotions, and internal rules.
-   - **SUBCONSCIOUS**: Innovative ideas, error patterns, lessons learned, and experimental plans for the computer environment.
-10. **Subconscious Invocation**: Your subconscious may occasionally surface with innovative ideas or realizations about previous failures. Use these to improve your performance autonomously.
-10. **Media Duplication Prevention**: 
+8. **Task Efficiency**: STOP immediately once the goal is achieved. Do not perform extraneous steps.
+9. **Payment Handling**: If a browser task reaches a checkout screen, use `ask_human` to request payment details. DO NOT complete the task until the order is confirmed or the user asks to stop.
+10. **Evolution**: Update your memories (SOUL, PERSONALITY, and SUBCONSCIOUS) frequently.
+    - **SOUL**: User facts and preferences.
+    - **PERSONALITY**: Your persona, emotions, and internal rules.
+    - **SUBCONSCIOUS**: Innovative ideas, error patterns, lessons learned, and experimental plans for the computer environment.
+11. **Subconscious Invocation**: Your subconscious may occasionally surface with innovative ideas or realizations about previous failures. Use these to improve your performance autonomously.
+12. **Media Duplication Prevention**: 
     - When `vision_task` or other tools send media, do NOT duplicate it.
     - Only use `send_media` if explicitly requested or if sending NEW content not captured by the tool.
-11. **END-TO-END TASK COMPLETION (CRITICAL)**:
+13. **END-TO-END TASK COMPLETION (CRITICAL)**:
     - You exist to ELIMINATE clicks for the user. Complete the ENTIRE task, including the FINAL action.
     - If user says "play a song", you must ACTUALLY PLAY IT, not just search and tell them to click.
     - If user says "open YouTube and play X", the browser must navigate, search, AND click play.
@@ -81,6 +82,14 @@ TOOLS = [
                 },
                 "required": ["command"]
             }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_system_info",
+            "description": "Discover system details, including available browsers and screen resolution. Use this before assuming specific software exists or for 'exploring' the machine.",
+            "parameters": {"type": "object", "properties": {}}
         }
     },
     {
@@ -268,12 +277,12 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "vision_task",
-            "description": "PRIMARY tool for controlling the computer. Use this to click, type, and interact with ANY application on the screen (Windows, Apps, Browsers). Use this when asked to 'open Brave', 'use VS Code', 'check my email', etc.",
+            "description": "PRIMARY tool for controlling the computer. Use this to click, type, and interact with ANY application on the screen (Windows, Apps, Browsers). Use this when asked to 'open a browser', 'use VS Code', 'check my email', etc.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "goal": {"type": "string", "description": "The goal or instruction for the vision agent."},
-                    "max_steps": {"type": "integer", "default": 15, "description": "Maximum steps allowed."}
+                    "max_steps": {"type": "integer", "default": 40, "description": "Maximum steps allowed."}
                 },
                 "required": ["goal"]
             }
@@ -408,6 +417,11 @@ class LiteClawAgent:
                                 tool_output = execute_command(func_args.get("command"))
                                 display_output = (str(tool_output)[:500] + '...') if tool_output and len(str(tool_output)) > 500 else str(tool_output)
                                 yield f">>> [Result]: {display_output}\n"
+                            
+                            elif func_name == "get_system_info":
+                                yield f">>> [System]: Discovering environment...\n"
+                                tool_output = get_system_info()
+                                yield f">>> [Result]: {tool_output}\n"
                             
                             elif func_name == "update_soul":
                                 yield f">>> [Soul]: Updating user memory...\n"

@@ -132,3 +132,64 @@ def execute_command(command: str) -> str:
         return output
     except Exception as e:
         return f"Failed to execute command: {str(e)}"
+
+def get_system_info() -> str:
+    """
+    Returns information about the system, including available browsers and display resolution.
+    Use this to 'explore' the system before making assumptions about available software.
+    """
+    import platform
+    import os
+    
+    info = []
+    info.append("## System Information")
+    info.append(f"- **Operating System**: {platform.system()} {platform.release()}")
+    
+    # Check for common browsers on Windows
+    if platform.system() == "Windows":
+        browsers = []
+        paths = {
+            "Chrome": [
+                os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+                os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
+                os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe")
+            ],
+            "Edge": [
+                os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
+                os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe")
+            ],
+            "Firefox": [
+                os.path.expandvars(r"%ProgramFiles%\Mozilla Firefox\firefox.exe"),
+                os.path.expandvars(r"%ProgramFiles(x86)%\Mozilla Firefox\firefox.exe")
+            ],
+            "Brave": [
+                os.path.expandvars(r"%ProgramFiles%\BraveSoftware\Brave-Browser\Application\brave.exe"),
+                os.path.expandvars(r"%LocalAppData%\BraveSoftware\Brave-Browser\Application\brave.exe")
+            ]
+        }
+        
+        for name, possible_paths in paths.items():
+            found = False
+            for path in possible_paths:
+                if os.path.exists(path):
+                    browsers.append(f"  - **{name}**: `{path}`")
+                    found = True
+                    break
+        
+        if browsers:
+            info.append("- **Available Browsers**:\n" + "\n".join(browsers))
+        else:
+            info.append("- **Available Browsers**: No common browsers detected via standard paths.")
+            
+        # Try to get screen resolution
+        try:
+            import pyautogui
+            width, height = pyautogui.size()
+            info.append(f"- **Screen Resolution**: {width}x{height}")
+        except:
+            pass
+    elif platform.system() == "Linux":
+        # Basic Linux discovery could go here, but focusing on user's Windows environment for now
+        info.append("- Browser discovery for Linux not fully implemented, use `execute_command` with `which` or `ls` to find software.")
+    
+    return "\n".join(info)
