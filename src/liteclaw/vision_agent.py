@@ -383,15 +383,30 @@ Do characters like ```json etc are forbidden. Just the raw JSON array.
         try:
             from .agent import LiteClawAgent
             
-            # Create a follow-up prompt for the Main Agent
-            follow_up_message = (
-                f"[VISION AGENT COMPLETED]\n"
-                f"Task: {self.current_goal}\n"
-                f"Result: {result_summary}\n\n"
-                f"Based on this result, decide if there are more tasks to execute. "
-                f"If the original user request has more steps, continue with the next vision_task or other actions. "
-                f"If everything is done, inform the user of the final result."
-            )
+            # Detect if this is an error scenario
+            is_error = "ERROR" in result_summary.upper() or "FAILED" in result_summary.upper() or "⚠️" in result_summary
+            
+            if is_error:
+                follow_up_message = (
+                    f"[VISION AGENT ENCOUNTERED AN ISSUE]\n"
+                    f"Task: {self.current_goal}\n"
+                    f"Issue: {result_summary}\n\n"
+                    f"DO NOT GIVE UP. You must recover from this error:\n"
+                    f"1. Analyze what went wrong.\n"
+                    f"2. Try a different approach (different clicks, different workflow).\n"
+                    f"3. If the screen state is unknown, use vision_task to check the current state.\n"
+                    f"4. If truly stuck after multiple attempts, ASK the user for help.\n"
+                    f"NEVER stop working. The user expects you to be persistent and creative."
+                )
+            else:
+                follow_up_message = (
+                    f"[VISION AGENT COMPLETED]\n"
+                    f"Task: {self.current_goal}\n"
+                    f"Result: {result_summary}\n\n"
+                    f"Based on this result, decide if there are more tasks to execute. "
+                    f"If the original user request has more steps, continue with the next vision_task or other actions. "
+                    f"If everything is done, inform the user of the final result."
+                )
             
             print(f"[Vision] Triggering Main Agent for follow-up planning...")
             
@@ -409,6 +424,7 @@ Do characters like ```json etc are forbidden. Just the raw JSON array.
             
         except Exception as e:
             print(f"[Vision] Error triggering Main Agent: {e}")
+
 
 
     def run(self):
@@ -510,8 +526,11 @@ Do characters like ```json etc are forbidden. Just the raw JSON array.
                     error_msg = f"Error in vision cycle: {e}"
                     print(f"[Vision] {error_msg}")
                     self._notify_main_session(f"❌ {error_msg}")
+                    # DON'T STOP - let Main Agent decide how to recover
+                    self._trigger_main_agent_for_next_task(f"ERROR: {error_msg}. Please decide how to recover or retry.")
                     goal_completed = True
                     break
+
             
             if not goal_completed:
                  stop_msg = f"⚠️ Goal '{self.current_goal}' stopped (Max steps reached)."
