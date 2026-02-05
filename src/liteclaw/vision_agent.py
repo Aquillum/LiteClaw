@@ -113,10 +113,8 @@ class VisionAgent:
     def get_system_prompt(self) -> str:
         return f"""
 You are an advanced Vision Agent capable of controlling a computer to achieve a goal.
-You operate in a **Plan-Work-Loop** cycle:
-1. **PLAN**: Analyze the screen and create a list of logical steps to achieve the goal or the next milestone.
-2. **WORK**: Execute the planned steps sequentially.
-3. **LOOP**: Re-evaluate the screen after the plan is completed or if a step requires dynamic feedback.
+You will receive the current state of the screen as an image.
+You must output a JSON object describing the NEXT action to take.
 
 ### YOUR CURRENT GOAL
 **{self.current_goal or self.goal}**
@@ -125,10 +123,6 @@ You operate in a **Plan-Work-Loop** cycle:
 - The screen uses a normalized coordinate system from 0 to 1000.
 - Top-Left is (0, 0). Bottom-Right is (1000, 1000).
 - When you need to click something, return its bounding box: [ymin, xmin, ymax, xmax].
-
-### Detailed Planning
-- When creating a plan, describe what you intend to do in the next 1-5 actions.
-- This prevents duplicated work and ensures logical flow (e.g. click search bar -> type text -> press enter).
 
 ### Available Actions
 1. **CLICK**: Left click on an element.
@@ -150,22 +144,21 @@ You operate in a **Plan-Work-Loop** cycle:
 - When in doubt, DO NOT FINISH. Keep executing the next logical step.
 
 ### Response Format (Strict JSON)
-You must return a **list of action objects**. Even if it's just one action, it must be in a list.
-[
-  {{
-    "thought": "I see the icon, I should click it.",
-    "action": "CLICK",
-    "bbox": [ymin, xmin, ymax, xmax]
-  }},
-  {{
-    "thought": "Now that the window is open, I will type the search query.",
-    "action": "TYPE",
-    "text": "my search"
-  }}
-]
-
-Do characters like ```json etc are forbidden. Just the raw JSON array.
+{{
+  "thought": "Brief reasoning about what to do next based on the screen.",
+  "action": "CLICK" | "DOUBLE_CLICK" | "RIGHT_CLICK" | "TYPE" | "HOTKEY" | "SCROLL" | "WAIT" | "ASK_USER" | "FINISH",
+  "bbox": [ymin, xmin, ymax, xmax],  // For CLICK, DOUBLE_CLICK, RIGHT_CLICK
+  "text": "some text",               // For TYPE
+  "keys": ["key1", "key2"],          // For HOTKEY
+  "direction": "down",               // For SCROLL
+  "amount": 3,                       // For SCROLL
+  "duration": 2.5,                   // For WAIT
+  "question": "Which file?",         // For ASK_USER
+  "reason": "Task done."             // For FINISH
+}}
+Do not return markdown code blocks. Just the raw JSON string.
 """
+
 
 
     def parse_response(self, content: str) -> List[Dict[str, Any]]:
@@ -456,10 +449,10 @@ Do characters like ```json etc are forbidden. Just the raw JSON array.
                     feedback_msg = "\n[USER CORRECTION]: " + "\n- ".join(list(self.feedback_queue))
                     self.feedback_queue.clear()
 
-                # 2. Think & Plan (Call LLM)
+                # 2. Think (Call LLM)
                 try:
                     user_content_str = f"GOAL: {self.current_goal}\n\nHistory: {self.history}\n{feedback_msg}"
-                    print(f"[Vision] Thinking about the next plan...")
+                    print(f"[Vision] Thinking about the next step...")
                     
                     messages = [
                         {"role": "system", "content": self.get_system_prompt()},
@@ -478,49 +471,36 @@ Do characters like ```json etc are forbidden. Just the raw JSON array.
                     )
                     
                     content = response.choices[0].message.content
-                    plan = self.parse_response(content)
+                    actions = self.parse_response(content)
                     
-                    if not plan:
-                        print("[Vision] Failed to generate plan. Retrying...")
+                    if not actions:
+                        print("[Vision] Failed to parse response. Retrying...")
                         time.sleep(2)
                         continue
                     
-                    # 3. Work (Execute Plan)
-                    print(f"[Vision] 📋 Executing plan of {len(plan)} actions...")
-                    for action_data in plan:
-                        if self.step_count >= current_max_steps:
-                            break
-                        
-                        if isinstance(action_data, list):
-                            action_data = action_data[0]
-                            
-                        self.step_count += 1
-                        
-                        # Execute
-                        result_msg = self.execute_action(action_data, screenshot)
-                        
-                        if result_msg == "FINISH":
-                            final_reason = action_data.get('reason', 'Done')
-                            print(f"[Vision] 🏁 Finished: {final_reason}")
-                            self._notify_main_session(f"✅ Goal Completed: {self.current_goal}\nResult: {final_reason}")
-                            # Trigger Main Agent to plan the next task
-                            self._trigger_main_agent_for_next_task(final_reason)
-                            goal_completed = True
-                            break
-
-                        
-                        # Record
-                        summary = f"Step {self.step_count}: {action_data.get('thought')} -> {action_data.get('action')} => {result_msg}"
-                        self.history.append(summary)
-                        print(f"[Vision] {summary}")
-                        
-                        time.sleep(1.5)
-                        
-                    if goal_completed:
+                    # 3. Act (Single Action)
+                    action_data = actions[0]
+                    self.step_count += 1
+                    
+                    # Execute
+                    result_msg = self.execute_action(action_data, screenshot)
+                    
+                    if result_msg == "FINISH":
+                        final_reason = action_data.get('reason', 'Done')
+                        print(f"[Vision] 🏁 Finished: {final_reason}")
+                        self._notify_main_session(f"✅ Goal Completed: {self.current_goal}\nResult: {final_reason}")
+                        # Trigger Main Agent to plan the next task
+                        self._trigger_main_agent_for_next_task(final_reason)
+                        goal_completed = True
                         break
                     
-                    # End of plan cycle
-                    print(f"[Vision] Plan cycle complete. Re-evaluating...")
+                    # Record
+                    summary = f"Step {self.step_count}: {action_data.get('thought')} -> {action_data.get('action')} => {result_msg}"
+                    self.history.append(summary)
+                    print(f"[Vision] {summary}")
+                    
+                    time.sleep(1)
+
     
                 except Exception as e:
                     error_msg = f"Error in vision cycle: {e}"
