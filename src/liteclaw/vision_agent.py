@@ -375,6 +375,42 @@ Do characters like ```json etc are forbidden. Just the raw JSON array.
         except Exception as e:
             print(f"[Vision] Failed to send notification: {e}")
 
+    def _trigger_main_agent_for_next_task(self, result_summary: str):
+        """
+        After Vision completes a goal, trigger the Main Agent to decide the next action.
+        This ensures the Main Agent can plan follow-up tasks autonomously.
+        """
+        try:
+            from .agent import LiteClawAgent
+            
+            # Create a follow-up prompt for the Main Agent
+            follow_up_message = (
+                f"[VISION AGENT COMPLETED]\n"
+                f"Task: {self.current_goal}\n"
+                f"Result: {result_summary}\n\n"
+                f"Based on this result, decide if there are more tasks to execute. "
+                f"If the original user request has more steps, continue with the next vision_task or other actions. "
+                f"If everything is done, inform the user of the final result."
+            )
+            
+            print(f"[Vision] Triggering Main Agent for follow-up planning...")
+            
+            # Process in background to avoid blocking
+            def run_main_agent():
+                try:
+                    agent = LiteClawAgent()
+                    agent.process_message(follow_up_message, self.session_id, self.platform)
+                except Exception as e:
+                    print(f"[Vision] Failed to trigger Main Agent: {e}")
+            
+            import threading
+            t = threading.Thread(target=run_main_agent, daemon=True)
+            t.start()
+            
+        except Exception as e:
+            print(f"[Vision] Error triggering Main Agent: {e}")
+
+
     def run(self):
         print(f"[Vision] Agent started. Waiting for goals...")
         
@@ -451,8 +487,11 @@ Do characters like ```json etc are forbidden. Just the raw JSON array.
                             final_reason = action_data.get('reason', 'Done')
                             print(f"[Vision] 🏁 Finished: {final_reason}")
                             self._notify_main_session(f"✅ Goal Completed: {self.current_goal}\nResult: {final_reason}")
+                            # Trigger Main Agent to plan the next task
+                            self._trigger_main_agent_for_next_task(final_reason)
                             goal_completed = True
                             break
+
                         
                         # Record
                         summary = f"Step {self.step_count}: {action_data.get('thought')} -> {action_data.get('action')} => {result_msg}"
@@ -478,5 +517,8 @@ Do characters like ```json etc are forbidden. Just the raw JSON array.
                  stop_msg = f"⚠️ Goal '{self.current_goal}' stopped (Max steps reached)."
                  print(f"[Vision] {stop_msg}")
                  self._notify_main_session(stop_msg)
+                 # Still trigger Main Agent to decide what to do (retry, ask user, etc.)
+                 self._trigger_main_agent_for_next_task(stop_msg)
+
         
         print("[Vision] Agent stopped.")
