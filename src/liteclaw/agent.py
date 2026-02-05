@@ -5,16 +5,14 @@ from typing import List, Dict, Any, Generator
 from .config import settings
 from .tools import execute_command, get_system_info
 from .memory import add_message, get_session_history
-from .meta_memory import get_soul_memory, update_soul_memory, get_personality_memory, update_personality_memory, get_subconscious_memory, AGENT_FILE
+from .meta_memory import get_soul_memory, update_soul_memory, get_personality_memory, update_personality_memory, get_subconscious_memory, get_learning_memory, AGENT_FILE
+
 import litellm
 import threading
 
 # Singleton Vision Registry
 GLOBAL_VISION_AGENT = None
-import threading
 
-# Singleton Vision Registry
-GLOBAL_VISION_AGENT = None
 
 BASE_SYSTEM_PROMPT = """
 ## Core Directives - AGI IDENTITY
@@ -98,8 +96,13 @@ def get_system_prompt():
     subconscious_memory = get_subconscious_memory()
     if subconscious_memory:
         prompt += f"\n\n## SUBCONSCIOUS (Innovations / Lessons / Experiments)\n{subconscious_memory}\n"
+        
+    learning_memory = get_learning_memory()
+    if learning_memory:
+        prompt += f"\n\n## LEARNING (Best Practices / Refined Workflows / Self-Organization)\n{learning_memory}\n"
 
     return prompt
+
 
 SYSTEM_PROMPT = get_system_prompt()
 
@@ -338,8 +341,38 @@ TOOLS = [
                 "required": ["goal"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "take_break",
+            "description": "Take a rest for a specified duration to ensure system stability and mental clarity. Use this when tasks are completed or you need to pause.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "duration_minutes": {"type": "integer", "default": 30, "description": "Duration of the break in minutes (min 30)."}
+                },
+                "required": ["duration_minutes"]
+            }
+        }
+    },
+
+    {
+        "type": "function",
+        "function": {
+            "name": "update_learning",
+            "description": "Store best practices, refined workflows, lessons learned, and self-organization strategies evolved from your work. Use this to continuously improve your professional standards.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "content": {"type": "string", "description": "The new content for your learning memory."}
+                },
+                "required": ["content"]
+            }
+        }
     }
 ]
+
 
 class LiteClawAgent:
     def __init__(self):
@@ -363,7 +396,20 @@ class LiteClawAgent:
             self.full_model_name = self.model
 
     def process_message(self, user_message: str, session_id: str = "default", platform: str = "whatsapp") -> str:
+        # Check for Break Time
+        import time
+        now = time.time()
+        if settings.BREAK_UNTIL > now:
+            remaining = int((settings.BREAK_UNTIL - now) / 60)
+            # If the user is explicitly telling us to wake up, we might consider it, 
+            # but per requirement "default not less than 30 mins", we'll respect the break.
+            if "wake up" in user_message.lower() or "emergency" in user_message.lower():
+                settings.BREAK_UNTIL = 0 # Force wake up
+            else:
+                return f"I am currently on a scheduled break for another {remaining} minutes to maintain peak cognitive performance. Please reach out after that, or say 'wake up' if it's an emergency."
+
         response_content = ""
+
         for chunk in self.stream_process_message(user_message, session_id, platform):
             print(chunk, end="", flush=True)
             if not chunk.startswith(">>> "):
@@ -489,6 +535,13 @@ class LiteClawAgent:
                                 from .meta_memory import update_subconscious_memory
                                 tool_output = update_subconscious_memory(func_args.get("content"))
                                 yield f">>> [Result]: {tool_output}\n"
+                            
+                            elif func_name == "update_learning":
+                                yield f">>> [Learning]: Evolving best practices...\n"
+                                from .meta_memory import update_learning_memory
+                                tool_output = update_learning_memory(func_args.get("content"))
+                                yield f">>> [Result]: {tool_output}\n"
+
 
                             # ... [Other tool handlers remain here, simply consolidated logic below] ...
 
@@ -735,8 +788,16 @@ class LiteClawAgent:
                                 
                                 yield f">>> [GIF Result]: {tool_output}\n"
                             
+                            elif func_name == "take_break":
+                                import time
+                                duration = max(30, func_args.get("duration_minutes", 30))
+                                settings.BREAK_UNTIL = time.time() + (duration * 60)
+                                tool_output = f"Break scheduled for {duration} minutes. I will be resting until {time.ctime(settings.BREAK_UNTIL)}."
+                                yield f">>> [System]: {tool_output}\n"
+
                             else:
                                 tool_output = f"Unknown tool: {func_name}"
+
 
                             yield f">>> --- ✅ Done: {func_name} ---\n\n"
                             

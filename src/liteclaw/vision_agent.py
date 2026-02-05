@@ -64,7 +64,6 @@ class VisionAgent:
             self.screen_width, self.screen_height = (1920, 1080) # Fallback if headless/error
             
         # Ensure screenshot dir exists
-        # Ensure screenshot dir exists
         self.screenshot_dir = settings.get_screenshots_dir()
         os.makedirs(self.screenshot_dir, exist_ok=True)
         
@@ -103,9 +102,7 @@ class VisionAgent:
         screenshot = pyautogui.screenshot()
         
         # Handle Retina Scaling (macOS)
-        # If screenshot size doesn't match logical size, resize it to logical
         if screenshot.size != (self.screen_width, self.screen_height):
-            # print(f"[Vision] Scaling detected: {screenshot.size} != {self.screen_width}x{self.screen_height}. Resizing...")
             screenshot = screenshot.resize((self.screen_width, self.screen_height), Image.Resampling.LANCZOS)
 
         buffered = BytesIO()
@@ -116,68 +113,63 @@ class VisionAgent:
     def get_system_prompt(self) -> str:
         return """
 You are an advanced Vision Agent capable of controlling a computer to achieve a goal.
-You will receive the current state of the screen as an image.
-You must output a JSON object describing the next action to take.
+You operate in a **Plan-Work-Loop** cycle:
+1. **PLAN**: Analyze the screen and create a list of logical steps to achieve the goal or the next milestone.
+2. **WORK**: Execute the planned steps sequentially.
+3. **LOOP**: Re-evaluate the screen after the plan is completed or if a step requires dynamic feedback.
 
 ### Coordinate System
 - The screen uses a normalized coordinate system from 0 to 1000.
 - Top-Left is (0, 0). Bottom-Right is (1000, 1000).
 - When you need to click something, return its bounding box: [ymin, xmin, ymax, xmax].
 
+### Detailed Planning
+- When creating a plan, describe what you intend to do in the next 1-5 actions.
+- This prevents duplicated work and ensures logical flow (e.g. click search bar -> type text -> press enter).
+
 ### Available Actions
 1. **CLICK**: Left click on an element.
-   - Required fields: "bbox" (normalized [ymin, xmin, ymax, xmax])
-2. **DOUBLE_CLICK**: Double left click on an element (use for opening files/folders).
-   - Required fields: "bbox" (normalized [ymin, xmin, ymax, xmax])
-3. **RIGHT_CLICK**: Right click on an element (use to open context menus).
-   - Required fields: "bbox" (normalized [ymin, xmin, ymax, xmax])
+2. **DOUBLE_CLICK**: Double left click.
+3. **RIGHT_CLICK**: Right click.
 4. **TYPE**: Type text.
-   - Required fields: "text" (string to type)
-5. **HOTKEY**: Press a key combination.
-   - Required fields: "keys" (list of strings, e.g. ["ctrl", "c"], ["enter"], ["win"])
-6. **SCROLL**: Scroll the mouse wheel.
-   - Required fields: "direction" ("up" | "down"), "amount" (integer).
-   - Tip: "amount" is number of mouse clicks. 1 = small step. 5 = medium.
-7. **MOVE_TO**: Move the mouse without clicking.
-   - Required fields: "point" ([x, y] normalized 0-1000)
-8. **WAIT**: Wait for a few seconds.
-   - Required fields: "duration" (float, seconds)
-9. **ASK_USER**: Pause execution and ask the user for help, decision, or data.
-   - Required fields: "question" (string)
-10. **FINISH**: Goal is achieved or impossible.
-    - Required fields: "reason" (string)
+5. **HOTKEY**: Press a key combination (e.g. ["ctrl", "v"]).
+6. **SCROLL**: Scroll ("up" | "down", amount).
+7. **WAIT**: Wait for seconds.
+8. **ASK_USER**: Ask the user for help.
+9. **FINISH**: Goal succeeded or failed.
 
 ### Response Format (Strict JSON)
-{
-  "thought": "Brief reasoning about what to do next based on the screen.",
-  "action": "CLICK" | "DOUBLE_CLICK" | "RIGHT_CLICK" | "TYPE" | "HOTKEY" | "SCROLL" | "MOVE_TO" | "WAIT" | "ASK_USER" | "FINISH",
-  "bbox": [ymin, xmin, ymax, xmax],  // For CLICK, DOUBLE_CLICK, RIGHT_CLICK
-  "text": "some text",               // For TYPE
-  "keys": ["key1", "key2"],          // For HOTKEY
-  "direction": "down",               // For SCROLL
-  "amount": 3,                       // For SCROLL
-  "point": [500, 500],               // For MOVE_TO
-  "duration": 2.5,                   // For WAIT
-  "question": "Which file?",         // For ASK_USER
-  "reason": "Task done."             // For FINISH
-}
-Do not return markdown code blocks. Just the raw JSON string.
+You must return a **list of action objects**. Even if it's just one action, it must be in a list.
+[
+  {
+    "thought": "I see the icon, I should click it.",
+    "action": "CLICK",
+    "bbox": [ymin, xmin, ymax, xmax]
+  },
+  {
+    "thought": "Now that the window is open, I will type the search query.",
+    "action": "TYPE",
+    "text": "my search"
+  }
+]
+
+Do characters like ```json etc are forbidden. Just the raw JSON array.
 """
 
-    def parse_response(self, content: str) -> Optional[Dict[str, Any]]:
+    def parse_response(self, content: str) -> List[Dict[str, Any]]:
         cleaned = content.replace("```json", "").replace("```", "").strip()
         try:
-            # Try standard json first
-            return json.loads(cleaned)
+            data = json.loads(cleaned)
+            return data if isinstance(data, list) else [data]
         except json.JSONDecodeError:
             try:
-                # Try json_repair for LLM-jankiness
                 from json_repair import repair_json
                 repaired = repair_json(cleaned)
-                return json.loads(repaired)
+                data = json.loads(repaired)
+                return data if isinstance(data, list) else [data]
             except Exception as e:
                 print(f"Error parsing JSON: {cleaned} (Error: {e})")
-                return None
+                return []
 
     def execute_action(self, action_data: Dict[str, Any], screenshot: Any):
         """Executes the action determined by the LLM."""
@@ -250,13 +242,8 @@ Do not return markdown code blocks. Just the raw JSON string.
         elif action_type == "SCROLL":
             direction = action_data.get("direction", "down")
             amount = action_data.get("amount", 3)
-            # Smooth scroll implementation
-            # User reported 1 unit = bottom of page with previous 120 multiplier.
-            # Hypothesis: On this machine, scroll value is interpreted as 'clicks', not 'units'.
-            # We will use 1 as the base unit per step.
             clicks = amount
             for _ in range(clicks):
-                # Using +/- 1 here assuming the OS interprets this as 1 click/notch
                 scroll_cmd = -1 if direction == "down" else 1
                 pyautogui.scroll(scroll_cmd)
                 time.sleep(0.1) 
@@ -280,28 +267,20 @@ Do not return markdown code blocks. Just the raw JSON string.
         
         elif action_type == "ASK_USER":
             question = action_data.get("question", "Help needed.")
-            
-            # Send screenshot context to user first (so they see what the agent sees)
             self._send_screenshot_to_user(screenshot, caption=f"I need help with this: {question}")
             
-            # Use browser_utils hook to wait for answer
             from .browser_utils import ask_human_for_input
             import asyncio
             
-            # Helper to run async in this sync method
             def run_async(coro):
                 try:
                     loop = asyncio.get_event_loop()
                     if loop.is_running():
-                         # This is risky in a sync call inside an unknown loop state
-                         # Ideally we should use a new thread or future.
-                         # For LiteClaw architecture, we use a dedicated thread helper
                          from .browser_utils import _run_async_task_in_thread
                          return _run_async_task_in_thread(coro)
                     else:
                         return loop.run_until_complete(coro)
                 except Exception:
-                     # Fallback
                      from .browser_utils import _run_async_task_in_thread
                      return _run_async_task_in_thread(coro)
 
@@ -362,7 +341,6 @@ Do not return markdown code blocks. Just the raw JSON string.
         """Send a notification message back to the main session via bridge."""
         from .main import WHATSAPP_BRIDGE_URL
         
-        # Truncate if too long for messaging platforms
         if len(message) > 1500:
             message = message[:1500] + "...[truncated]"
             
@@ -376,7 +354,6 @@ Do not return markdown code blocks. Just the raw JSON string.
                 "platform": self.platform
             })
             
-            # Also attempt to persist in conversation history for the session agent
             try:
                 from .memory import add_message
                 add_message(self.session_id, {"role": "system", "content": final_text})
@@ -396,13 +373,9 @@ Do not return markdown code blocks. Just the raw JSON string.
                 
             # Pick next goal
             self.current_goal = self.goal_queue.popleft()
-            self.goal = self.current_goal # Update for system prompt context
+            self.goal = self.current_goal 
             self.step_count = 0
-            self.history = [] # Reset history for new goal? Or keep context? 
-            # User said "all subagents will be a single entity", implying shared context?
-            # But "injected new prompt" usually means a distinct task. 
-            # Let's clean history to avoid context window explosion, but maybe keep last summary?
-            # For now, clean slate per goal is safer.
+            self.history = [] 
             
             print(f"[Vision] 🟢 Starting goal: {self.current_goal}")
             
@@ -410,42 +383,19 @@ Do not return markdown code blocks. Just the raw JSON string.
             goal_completed = False
             
             while self.step_count < current_max_steps and not goal_completed:
-                self.step_count += 1
-                
-                # Check for Real-time Feedback/Corrections
-                feedback_msg = ""
-                if self.feedback_queue:
-                    print(f"[Vision] Processing {len(self.feedback_queue)} corrections...")
-                    feedback_msg = "\n\n[USER CORRECTION]: "
-                    while self.feedback_queue:
-                        feedback_msg += f"\n- {self.feedback_queue.popleft()}"
-                    feedback_msg += "\n\nPLEASE ADJUST YOUR PLAN ACCORDINGLY."
-
-                # AGI-Reflection Loop (Every 5 steps)
-                checkpoint_msg = ""
-                if self.step_count > 0 and self.step_count % 5 == 0:
-                    print(f"[Vision] Step {self.step_count}: Entering REFLECTION phase...")
-                    time.sleep(2) 
-                    checkpoint_msg = (
-                        f"\n\n[SYSTEM CHECKPOINT - Step {self.step_count}]"
-                        f"\nSTOP. You have executed 5 steps."
-                        f"\n1. REFLECT: Look at your history. Are you closer to the goal?"
-                        f"\n2. ANALYZE: If you failed any steps, why?"
-                        f"\n3. PLAN: What are the next 5 steps?"
-                        f"\n4. ADJUST: If stuck, try a completely different approach."
-                        f"\nSession limit auto-extended."
-                    )
-                    current_max_steps += 5
-                    print(f"[Vision] Session extended. New limit: {current_max_steps}")
-                
-                # Check if new high-priority goal injected? (Not implementing priority yet, just FIFO)
-                
-                # 1. Capture
+                # 1. Capture Screen
                 screenshot, b64_img = self.capture_screen()
                 
-                # 2. Think
+                # Check for Feedback
+                feedback_msg = ""
+                if self.feedback_queue:
+                    feedback_msg = "\n[USER CORRECTION]: " + "\n- ".join(list(self.feedback_queue))
+                    self.feedback_queue.clear()
+
+                # 2. Think & Plan (Call LLM)
                 try:
-                    user_content_str = f"GOAL: {self.current_goal}\n\nHistory: {self.history}{checkpoint_msg}{feedback_msg}"
+                    user_content_str = f"GOAL: {self.current_goal}\n\nHistory: {self.history}\n{feedback_msg}"
+                    print(f"[Vision] Thinking about the next plan...")
                     
                     messages = [
                         {"role": "system", "content": self.get_system_prompt()},
@@ -464,34 +414,52 @@ Do not return markdown code blocks. Just the raw JSON string.
                     )
                     
                     content = response.choices[0].message.content
-                    action_data = self.parse_response(content)
+                    plan = self.parse_response(content)
                     
-                    if not action_data:
-                        print("[Vision] Failed to parse response")
+                    if not plan:
+                        print("[Vision] Failed to generate plan. Retrying...")
+                        time.sleep(2)
                         continue
                     
-                    # 3. Act
-                    result_msg = self.execute_action(action_data, screenshot)
+                    # 3. Work (Execute Plan)
+                    print(f"[Vision] 📋 Executing plan of {len(plan)} actions...")
+                    for action_data in plan:
+                        if self.step_count >= current_max_steps:
+                            break
+                        
+                        if isinstance(action_data, list):
+                            action_data = action_data[0]
+                            
+                        self.step_count += 1
+                        
+                        # Execute
+                        result_msg = self.execute_action(action_data, screenshot)
+                        
+                        if result_msg == "FINISH":
+                            final_reason = action_data.get('reason', 'Done')
+                            print(f"[Vision] 🏁 Finished: {final_reason}")
+                            self._notify_main_session(f"✅ Goal Completed: {self.current_goal}\nResult: {final_reason}")
+                            goal_completed = True
+                            break
+                        
+                        # Record
+                        summary = f"Step {self.step_count}: {action_data.get('thought')} -> {action_data.get('action')} => {result_msg}"
+                        self.history.append(summary)
+                        print(f"[Vision] {summary}")
+                        
+                        time.sleep(1.5)
+                        
+                    if goal_completed:
+                        break
                     
-                    if result_msg == "FINISH":
-                        final_reason = action_data.get('reason', 'Done')
-                        print(f"[Vision] 🏁 Finished goal '{self.current_goal}': {final_reason}")
-                        self._notify_main_session(f"✅ Goal Completed: {self.current_goal}\nResult: {final_reason}")
-                        goal_completed = True
-                        break # Break inner loop, go back to queue
-                    
-                    # Record History
-                    summary = f"Step {self.step_count}: {action_data.get('thought')} -> {action_data.get('action')} => {result_msg}"
-                    self.history.append(summary)
-                    print(f"[Vision] {summary}")
-                    
-                    time.sleep(1)
+                    # End of plan cycle
+                    print(f"[Vision] Plan cycle complete. Re-evaluating...")
     
                 except Exception as e:
-                    error_msg = f"Error executing goal '{self.current_goal}': {e}"
+                    error_msg = f"Error in vision cycle: {e}"
                     print(f"[Vision] {error_msg}")
                     self._notify_main_session(f"❌ {error_msg}")
-                    goal_completed = True # Stop this goal on error
+                    goal_completed = True
                     break
             
             if not goal_completed:

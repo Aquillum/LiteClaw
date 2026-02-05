@@ -106,22 +106,10 @@ async def handle_whatsapp_incoming(request: Request):
             is_authorized = any(num in sender for num in allowed_list)
             print(f"[Auth Check] Sender: {sender}, Allowed: {allowed_list}, Authorized: {is_authorized}")
             if not is_authorized:
-                print(f"[Auth] ❌ Unauthorized WhatsApp sender: {sender}")
+                print(f"[Auth] ❌ Unauthorized sender: {sender}")
                 return {"status": "ignored_unauthorized"}
             else:
-                print(f"[Auth] ✅ Authorized WhatsApp sender: {sender}")
-    
-    elif platform == "telegram":
-        allowed_list = settings.TELEGRAM_ALLOWED_IDS
-        if allowed_list:
-            # We check if the ID (usually long number) or username is in the allowed list
-            is_authorized = any(str(uid) in sender for uid in allowed_list)
-            print(f"[Auth Check] Telegram Sender: {sender}, Allowed: {allowed_list}, Authorized: {is_authorized}")
-            if not is_authorized:
-                print(f"[Auth] ❌ Unauthorized Telegram sender: {sender}")
-                return {"status": "ignored_unauthorized"}
-            else:
-                print(f"[Auth] ✅ Authorized Telegram sender: {sender}")
+                print(f"[Auth] ✅ Authorized sender: {sender}")
     
     # 1. Create/Get Session
     # Use the specific sender ID as the session_id so sub-agents can notify back

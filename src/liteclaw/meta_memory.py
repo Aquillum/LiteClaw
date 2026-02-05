@@ -20,6 +20,8 @@ AGENT_FILE = get_file_path("AGENT.md")
 SOUL_FILE = get_file_path("SOUL.md")
 PERSONALITY_FILE = get_file_path("PERSONALITY.md")
 SUBCONSCIOUS_FILE = get_file_path("SUBCONSCIOUS.md")
+LEARNING_FILE = get_file_path("LEARNING.md")
+
 
 def read_file_content(filepath):
     if not os.path.exists(filepath):
@@ -41,6 +43,10 @@ def get_personality_memory():
 
 def get_subconscious_memory():
     return read_file_content(SUBCONSCIOUS_FILE)
+
+def get_learning_memory():
+    return read_file_content(LEARNING_FILE)
+
 
 def update_soul_memory(content: str):
     """
@@ -86,3 +92,16 @@ def update_subconscious_memory(content: str):
         return "Subconscious updated successfully."
     except Exception as e:
         return f"Failed to update Subconscious: {e}"
+
+def update_learning_memory(content: str):
+    """
+    Overwrites LEARNING.md with new content.
+    Stores best practices, lessons learned, and self-organization strategies.
+    """
+    try:
+        with open(LEARNING_FILE, "w", encoding="utf-8") as f:
+            f.write(content)
+        return "Learning memory updated successfully."
+    except Exception as e:
+        return f"Failed to update Learning memory: {e}"
+

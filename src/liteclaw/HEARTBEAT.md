@@ -1,6 +1,6 @@
 ---
-interval_seconds: 3600
-enabled: false
+interval_seconds: 60
+enabled: true
 ---
 
 # Heartbeat Tasks

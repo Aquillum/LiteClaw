@@ -57,19 +57,6 @@ function loadConfigs() {
 
 loadConfigs();
 
-function sanitize(message) {
-    if (!message) return "";
-    return message
-        .replace(/₹/g, 'Rs.')      // Rupee symbol -> Rs.
-        .replace(/€/g, 'EUR')       // Euro
-        .replace(/£/g, 'GBP')       // Pound
-        .replace(/¥/g, 'JPY')       // Yen
-        .replace(/\u00A0/g, ' ')    // Non-breaking space
-        .replace(/[\u2018\u2019]/g, "'")  // Smart quotes
-        .replace(/[\u201C\u201D]/g, '"')  // Smart double quotes
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ''); // Control chars
-}
-
 let client = null;
 
 if (WHATSAPP_TYPE === 'node_bridge' || (!TELEGRAM_TOKEN && !SLACK_BOT_TOKEN)) {
@@ -300,7 +287,7 @@ app.post('/whatsapp/send', async (req, res) => {
                     await bot.sendDocument(chatId, mediaSource, { caption: caption });
                 }
             } else {
-                await bot.sendMessage(chatId, sanitize(message));
+                await bot.sendMessage(chatId, message);
             }
             return res.json({ success: true, platform: 'telegram' });
         }
@@ -334,12 +321,26 @@ app.post('/whatsapp/send', async (req, res) => {
         }
 
         // --- WhatsApp Logic ---
+        // Check if client is ready before attempting to send
         if (!client || !client.info) {
             throw new Error("WhatsApp client not ready yet. Please wait for initialization.");
         }
 
-        // Sanitization handled by helper
-        let sanitizedMessage = sanitize(message);
+        // Sanitize message to avoid Puppeteer evaluation issues
+        // The "t: t" error is often caused by special characters in the browser context
+        let sanitizedMessage = message;
+        if (message) {
+            // Replace potentially problematic characters with safe alternatives
+            sanitizedMessage = message
+                .replace(/₹/g, 'Rs.')      // Rupee symbol -> Rs.
+                .replace(/€/g, 'EUR')       // Euro
+                .replace(/£/g, 'GBP')       // Pound
+                .replace(/¥/g, 'JPY')       // Yen
+                .replace(/\u00A0/g, ' ')    // Non-breaking space
+                .replace(/[\u2018\u2019]/g, "'")  // Smart quotes
+                .replace(/[\u201C\u201D]/g, '"')  // Smart double quotes
+                .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ''); // Control chars
+        }
 
         if (is_media) {
             let media;
@@ -443,8 +444,7 @@ function setupTelegramListeners(bot, botUsername) {
             fromMe: false
         };
 
-        const senderName = msg.from.first_name || "Telegram User";
-        console.log(`[Incoming] From ${senderName} (${sessionKey}): ${msg.text}`);
+        console.log(`[Telegram:@${botUsername}] Incoming from ${msg.chat.id}: ${msg.text}`);
 
         try {
             await axios.post(PYTHON_BACKEND_URL, payload);
@@ -532,7 +532,7 @@ if (SLACK_BOT_TOKEN && SLACK_APP_TOKEN) {
             fromMe: false
         };
 
-        console.log(`[Incoming] From ${realName} (${channel}): ${cleanText}`);
+        console.log(`[Slack] [${eventType}] From ${realName} (${userId}) in ${channel}: ${cleanText}`);
 
         // Acknowledge to Slack immediately (Async)
         axios.post(PYTHON_BACKEND_URL, payload).then(() => {

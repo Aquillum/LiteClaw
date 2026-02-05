@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     SLACK_SIGNING_SECRET: Optional[str] = None
     WHATSAPP_SESSION_ID: str = "whatsapp" # Dedicated session for WhatsApp interactions
     
+    # Break Time (Timestamp until when the agent is resting)
+    BREAK_UNTIL: float = 0
+    
     # Chrome Path
     CHROME_PATH: str = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
     

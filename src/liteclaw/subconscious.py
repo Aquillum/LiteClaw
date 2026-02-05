@@ -2,7 +2,8 @@ import time
 import threading
 import random
 from .agent import LiteClawAgent
-from .meta_memory import get_subconscious_memory
+from .meta_memory import get_subconscious_memory, get_learning_memory
+
 
 SUBCONSCIOUS_SESSION_ID = "subconscious-innovator"
 
@@ -36,7 +37,12 @@ class SubconsciousInnovator:
             if not self._running:
                 break
                 
-            self._trigger_innovation()
+            # Alternate between innovation and reflection
+            if random.random() > 0.5:
+                self._trigger_innovation()
+            else:
+                self._trigger_reflection()
+
 
     def _trigger_innovation(self):
         """Invoke the agent to act on subconscious thoughts."""
@@ -70,5 +76,34 @@ Complete the task and update your subconscious with new findings.
             print(f"[Subconscious] ✅ Innovation task complete. Result summary: {response[:100]}...")
         except Exception as e:
             print(f"[Subconscious] ❌ Innovation failed: {e}")
+
+    def _trigger_reflection(self):
+        """Review recent work and update learning memory."""
+        learning_mem = get_learning_memory()
+        
+        prompt = f"""
+[THINKING MODE: SELF-REFLECTION]
+Review your recent interactions and tasks. 
+Identify new best practices, workflow optimizations, or lessons learned.
+Organize these findings based on your preferred high standards and update your LEARNING.md.
+
+Current Learning Memory for context:
+---
+{learning_mem}
+---
+
+Your goal is to EVOLVE. Think deeply about how you can improve your own efficiency and reliability on this computer.
+"""
+        try:
+            print("[Subconscious] 🧠 Thinking... Reflecting on recent work.")
+            response = self._agent.process_message(
+                prompt,
+                session_id=SUBCONSCIOUS_SESSION_ID,
+                platform="learning"
+            )
+            print(f"[Subconscious] ✅ Reflection complete. Learning memory evolved.")
+        except Exception as e:
+            print(f"[Subconscious] ❌ Reflection failed: {e}")
+
 
 subconscious_innovator = SubconsciousInnovator()
