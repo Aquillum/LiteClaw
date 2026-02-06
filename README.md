@@ -6,6 +6,8 @@ LiteClaw is more than just a personal assistant—he is an **Autonomous AI Agent
 
 He has full access to your computer (Windows, Mac, or Linux) and operates independently to type, move the mouse, run commands, and browse the web. **Simply text him a job on WhatsApp, Telegram, or Slack, and he gets it done.**
 
+> ⚠️ **Security Note**: This is an autonomous experiment with full system access. **ALWAYS run this in a sandbox** (like VMware or VirtualBox) and never on your main production machine.
+
 <p align="center">
   <img src="assets/logo.png" width="300" alt="LiteClaw Logo">
 </p>
@@ -191,10 +193,10 @@ Most AIs are locked in a box and only speak when spoken to. LiteClaw is an **Aut
 > **CRITICAL**: This application has **NO sandboxing or security policies** by design. The entire point is to see what happens when AI has unrestricted access.
 > 
 > **Use with extreme caution:**
-> - ❌ Do NOT run this on production servers
+> - ❌ Do NOT run this on your main machine or production servers
 > - ❌ Do NOT give it access to sensitive data or high-privilege environments
 > - ❌ Do NOT use this in any security-critical context
-> - ✅ DO run this in isolated, experimental environments only
+> - ✅ **MUST run this in a sandbox** (VMware, VirtualBox, or an isolated dedicated machine)
 > - ✅ DO understand that you are responsible for all actions the agent takes
 >
 > **This is a research experiment, not a product.**
