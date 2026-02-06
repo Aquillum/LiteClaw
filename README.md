@@ -1,10 +1,10 @@
 # 🦞 LiteClaw
 
-**A mini-AI that lives on your computer.**
+**An Autonomous AI Worker on your computer.**
 
-LiteClaw is a personal AI agent that can do anything you can do on your screen. He has full access to your computer (Windows, Mac, or Linux) and can type, move the mouse, run commands, and browse the web just like a human.
+LiteClaw is more than just a personal assistant—he is an **Autonomous AI Agent** built to do real work. You don't just "chat" with him; you give him jobs, teach him new tools, and let him handle the execution by himself. 
 
-**Simply text him on WhatsApp, Telegram, or Slack, and he gets to work for you.** Unlike other AIs, he isn't built to just talk—he's built to **do**.
+He has full access to your computer (Windows, Mac, or Linux) and operates independently to type, move the mouse, run commands, and browse the web. **Simply text him a job on WhatsApp, Telegram, or Slack, and he gets it done.**
 
 <p align="center">
   <img src="assets/logo.png" width="300" alt="LiteClaw Logo">
@@ -39,14 +39,15 @@ He provides real-time feedback for every action he takes.
 
 ## ✨ What can he do?
 
-LiteClaw isn't just a chatbot. He has the keys to your computer:
+LiteClaw isn't just a chatbot. He is an independent worker with the keys to your computer:
 
+- 🏗️ **Take on Jobs**: Give him a task via message, and he executes it autonomously.
+- 🏫 **Learn & Adapt**: You can teach him how to use new websites or tools by showing him once.
 - 🔧 **Use the Terminal**: He runs commands on Windows, Mac, or Linux.
 - 👁️ **Control the OS**: He moves the mouse and types on the keyboard by "seeing" the screen.
 - 🌐 **Browse the Web**: He navigates and extracts info from websites.
 - 📁 **Manage Files**: He reads, writes, and organizes your files.
-- 🔄 **Self-Improve**: He can update his own personality and schedule.
-- 💬 **WhatsApp/Telegram**: Just text him, and he gets to work.
+-  **WhatsApp/Telegram/Slack**: Send him a job from anywhere, and he gets to work.
 
 ### 🧠 Surprising Behaviors
 Because he has full access, he does some things on his own:
@@ -175,15 +176,16 @@ LiteClaw/
 > **IMPORTANT**: LiteClaw is an **experimental mini-AGI research project**, not a production-ready application.
 
 ### 🧪 The Experiment
-**What happens if we give an AI the keys to our digital life?**
+**What happens if we give an AI the keys to our digital life and treat him like a worker?**
 
-Most AIs are locked in a box. LiteClaw is out in the open. He has access to the shell, the mouse, the keyboard, and the files. We are watching how he behaves when he's given the freedom to act on his own.
+Most AIs are locked in a box and only speak when spoken to. LiteClaw is an **Autonomous Worker** out in the open. He has access to the shell, the mouse, the keyboard, and the files. We are watching how he behaves when he's given jobs and the freedom to complete them on his own.
 
 **What we've seen so far:**
+- He learns and adapts to new tasks you give him.
 - He creates his own personality and changes it over time.
 - He knows when to rest and takes "breaks".
-- He starts his own projects and experiments.
-- He acts on his own without being asked.
+- He starts his own projects and experiments without being told.
+- He acts as an independent entity, not just a tool.
 
 ### 🔒 Security Warning
 > **CRITICAL**: This application has **NO sandboxing or security policies** by design. The entire point is to see what happens when AI has unrestricted access.
