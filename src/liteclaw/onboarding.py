@@ -107,6 +107,14 @@ PROVIDERS = {
             "deepseek-r1"
         ],
         "model_prefix": "ollama/"
+    },
+    "Custom (OpenAI Compatible)": {
+        "provider": "openai",
+        "base_url": "https://api.your-provider.com/v1",
+        "api_key_env": "CUSTOM_API_KEY",
+        "description": "Any OpenAI-compatible API (LMStudio, LocalAI, vLLM, etc.)",
+        "models": [],
+        "model_prefix": ""
     }
 }
 
@@ -271,7 +279,7 @@ def setup_llm(current_config=None):
         console.print("[yellow]ℹ️ Local Ollama doesn't require an API key[/yellow]")
         api_key = "not-needed"
     
-    # Handle custom base URL for Ollama
+    # Handle custom base URL
     base_url = provider_config["base_url"]
     if provider_name == "Ollama (Local)":
         custom_url = questionary.confirm(
@@ -284,6 +292,12 @@ def setup_llm(current_config=None):
                 default=base_url
             ).ask()
             if not base_url: base_url = provider_config["base_url"]
+    elif provider_name == "Custom (OpenAI Compatible)":
+        base_url = questionary.text(
+            "Enter Provider Base URL:",
+            default=base_url
+        ).ask()
+        if not base_url: base_url = provider_config["base_url"]
     
     # Model selection with better UX
     model_choices = provider_config["models"] + ["Enter custom model name"]
@@ -396,8 +410,16 @@ def setup_vision_llm(current_config, main_llm_config):
     
     # Base URL
     base_url = provider_config["base_url"]
-    if main_llm_config.get("LLM_PROVIDER") == provider_config["provider"]:
+    if main_llm_config.get("LLM_PROVIDER") == provider_config["provider"] and provider_name != "Custom (OpenAI Compatible)":
         base_url = main_llm_config.get("LLM_BASE_URL", base_url)
+
+    # Handle custom base URL for Vision
+    if provider_name == "Ollama (Local)":
+        custom_url = questionary.confirm("Using default Ollama URL (http://localhost:11434)?", default=True).ask()
+        if not custom_url:
+            base_url = questionary.text("Enter Ollama URL:", default="http://localhost:11434").ask()
+    elif provider_name == "Custom (OpenAI Compatible)":
+        base_url = questionary.text("Enter Vision Provider Base URL:", default=base_url).ask()
 
     # Model Selection
     model_choices = provider_config["models"] + ["Enter custom model name"]
