@@ -1,4 +1,4 @@
-# 🦞 LiteClaw
+<img width="761" height="663" alt="image" src="https://github.com/user-attachments/assets/6d1f57de-34a2-4c7f-863e-4006df96bf01" /><img width="761" height="663" alt="image" src="https://github.com/user-attachments/assets/1fed3900-a82d-4418-a188-b8121672a92c" /># 🦞 LiteClaw
 
 **An Autonomous AI Worker on your computer.**
 
@@ -22,7 +22,7 @@ LiteClaw is built to be autonomous. He doesn't just "chat"—he takes control of
 In this demo, he learns how to use complex dev tools like **lovable.dev** and **vibecode**. He doesn't use hidden APIs; he "sees" the screen and moves the cursor just like a human.
 
 <p align="center">
-  <video src="https://github.com/user-attachments/assets/59356396-8575-4e89-8041-94944810bf00" width="100%" controls></video>
+  [Hello](https://raw.githubusercontent.com/Pr0fe5s0r/LiteClaw/main/assets/first_prototype.mp4)
 </p>
 
 ### 📸 Execution Proof
