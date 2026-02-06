@@ -21,9 +21,7 @@ LiteClaw is built to be autonomous. He doesn't just "chat"—he takes control of
 ### 📺 Visual Autonomy: Mastering Tools
 In this demo, he learns how to use complex dev tools like **lovable.dev** and **vibecode**. He doesn't use hidden APIs; he "sees" the screen and moves the cursor just like a human.
 
-<p align="center">
-  <video src="https://raw.githubusercontent.com/Pr0fe5s0r/LiteClaw/main/assets/first_prototype.mp4" width="100%" controls></video>
-</p>
+<video src="assets/first_prototype.mp4" controls width="100%"></video>
 
 ### 📸 Execution Proof
 He provides real-time feedback for every action he takes.
