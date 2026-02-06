@@ -248,7 +248,7 @@ def setup_llm(current_config=None):
     default_choice = provider_choices[1]  # Default to OpenRouter
     if current_config and current_config.get("LLM_BASE_URL"):
         for name, config in PROVIDERS.items():
-            if config["base_url"] in current_config.get("LLM_BASE_URL", ""):
+            if config["base_url"] and config["base_url"] in current_config.get("LLM_BASE_URL", ""):
                 default_choice = f"{name} - {config['description']}"
                 break
     
