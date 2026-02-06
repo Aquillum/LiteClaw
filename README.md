@@ -1,10 +1,10 @@
 # 🦞 LiteClaw
 
-**An Experimental Mini-AGI: What if AI Had Access to Everything?**
+**A mini-AI that lives on your computer.**
 
-LiteClaw is an experimental mini-AGI project exploring a provocative question: **"What if the AI had access to all functions on your computer?"** 
+LiteClaw is a personal AI agent that can do anything you can do on your screen. He has full access to your computer (Windows, Mac, or Linux) and can type, move the mouse, run commands, and browse the web just like a human.
 
-Unlike traditional AI assistants with carefully sandboxed capabilities, LiteClaw is given near-complete autonomy over your system (Windows, Mac, or Linux)—shell execution, OS control, browser automation, file system access, and even the ability to modify his own personality and schedule his own tasks. **Simply message him via WhatsApp, Telegram, or Slack, and he works for you autonomously.** This project investigates what emerges when we remove the guardrails and let AI truly operate as an autonomous agent.
+**Simply text him on WhatsApp, Telegram, or Slack, and he gets to work for you.** Unlike other AIs, he isn't built to just talk—he's built to **do**.
 
 <p align="center">
   <img src="assets/logo.png" width="300" alt="LiteClaw Logo">
@@ -12,50 +12,50 @@ Unlike traditional AI assistants with carefully sandboxed capabilities, LiteClaw
 
 > **Note**: LiteClaw is a lightweight, Python-based experimental version of [OpenClaw](https://github.com/Pr0fe5s0r/OpenClaw), focusing on rapid experimentation with agentic behaviors, emergent intelligence, and how he learns to handle complex tasks for you.
 
-## 📸 Demos
+## �️ Demos
 
-Just like its powerful parent project OpenClaw, LiteClaw (the lite mini version) captures user commands and executes them precisely, providing real-time feedback and screenshots.
+LiteClaw is built to be autonomous. He doesn't just "chat"—he takes control of your system, executes tasks, and sends you screenshots of his progress.
+
+### 📺 Visual Autonomy: Mastering Tools
+In this demo, he learns how to use complex dev tools like **lovable.dev** and **vibecode**. He doesn't use hidden APIs; he "sees" the screen and moves the cursor just like a human.
+
+<p align="center">
+  <video src="assets/first_prototype.mp4" width="100%" controls></video>
+</p>
+
+### 📸 Execution Proof
+He provides real-time feedback for every action he takes.
 
 <p align="center">
   <img src="assets/printed_demo.png" width="400" alt="Printed Demo">
   <img src="assets/Screenhot_demo.png" width="400" alt="Screenshot Demo">
 </p>
 
-### 📺 First Prototype: Visual & Physical Autonomy
-In this early prototype, he learns to navigate and use complex web-based development tools like **lovable.dev** and **vibecode**. 
-
-Crucially, he does this **without DOM-based automation**. Instead, he relies on:
-- 👁️ **Visual Perception**: "Seeing" the screen like a human.
-- 🖱️ **Physical Control**: Using the cursor and keyboard to interact with your computer.
-
-> **Watch the Demo**: [First Prototype - Learning Tools via Vision](./assets/first_prototype.mp4)
-
-**Simply send him a message and let him get to work—he handles everything for you.**
+**Simply message him on WhatsApp, Telegram, or Slack and let him handle it.**
 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
-## ✨ Experimental Features: Mini-AGI in Action
+## ✨ What can he do?
 
-### 🧪 Core Concept: Unrestricted Access
-LiteClaw operates on a radical premise: **give the AI access to all functions on your computer**. This includes:
-- 🔧 **Shell Execution**: Full terminal command access on Windows, Mac, or Linux
-- 👁️ **Vision OS Control**: Cross-platform control via mouse movements and keyboard commands
-- 🌐 **Browser Automation**: Navigate, interact, and extract information from the web
-- 📁 **File System Access**: Read, write, and modify files on your system
-- 🔄 **Self-Modification**: Update his own personality, instructions, and behavior patterns
-- 💬 **Message-Driven**: Simply text him via WhatsApp, Telegram, or Slack—he works for you autonomously
+LiteClaw isn't just a chatbot. He has the keys to your computer:
 
-### 🧠 Emergent Autonomous Behaviors
-What happens when AI has this level of access? LiteClaw exhibits fascinating emergent behaviors:
+- 🔧 **Use the Terminal**: He runs commands on Windows, Mac, or Linux.
+- 👁️ **Control the OS**: He moves the mouse and types on the keyboard by "seeing" the screen.
+- 🌐 **Browse the Web**: He navigates and extracts info from websites.
+- 📁 **Manage Files**: He reads, writes, and organizes your files.
+- 🔄 **Self-Improve**: He can update his own personality and schedule.
+- 💬 **WhatsApp/Telegram**: Just text him, and he gets to work.
 
-- **🛌 Taking Breaks**: He can recognize when he needs to "rest" and schedule downtime
-- **🎭 Personality Evolution**: Through `PERSONALITY.md` and `SOUL.md`, he develops and refines his own character over time
-- **💡 Subconscious Innovation**: A built-in "Subconscious" system (`SUBCONSCIOUS.md`) triggers random technical experiments and self-improvement tasks
-- **💓 Proactive Heartbeat**: Autonomous periodic tasks defined in `HEARTBEAT.md` that he executes without prompting
-- **🧵 Sub-Agent Delegation**: Spawns background agents for long-running tasks, managing his own workload
-- **📅 Self-Scheduling**: Creates and manages his own cron jobs via API
+### 🧠 Surprising Behaviors
+Because he has full access, he does some things on his own:
+
+- **🛌 Takes Breaks**: He decides when he's tired and schedules some downtime.
+- **🎭 Evolves**: He develops his own character over time in `PERSONALITY.md`.
+- **💡 Subconscious Ideas**: He runs his own technical experiments in the background.
+- **💓 Proactive**: He performs tasks on his own schedule (via `HEARTBEAT.md`).
+- **📅 Self-Scheduling**: He manages his own calendar and background jobs.
 
 ### 🤖 Traditional AI Assistant Features
 Beyond the experimental aspects, LiteClaw also provides:
@@ -175,15 +175,15 @@ LiteClaw/
 > **IMPORTANT**: LiteClaw is an **experimental mini-AGI research project**, not a production-ready application.
 
 ### 🧪 The Experiment
-This project explores a fundamental question in AI development: **What emerges when we give AI unrestricted access to all functions on your computer?**
+**What happens if we give an AI the keys to our digital life?**
 
-Traditional AI assistants are carefully sandboxed—they can only do what we explicitly allow. LiteClaw takes the opposite approach: he has access to nearly everything on your system (shell, OS control, file system, browser, self-modification), and you can simply message him to have him work for you. We observe what behaviors emerge when AI has this level of autonomy.
+Most AIs are locked in a box. LiteClaw is out in the open. He has access to the shell, the mouse, the keyboard, and the files. We are watching how he behaves when he's given the freedom to act on his own.
 
-**What we've discovered so far:**
-- He develops his own personality and refines it over time
-- He schedules his own breaks and manages his own workload
-- He conducts autonomous experiments and self-improvement tasks
-- He exhibits proactive behavior beyond simple request-response patterns
+**What we've seen so far:**
+- He creates his own personality and changes it over time.
+- He knows when to rest and takes "breaks".
+- He starts his own projects and experiments.
+- He acts on his own without being asked.
 
 ### 🔒 Security Warning
 > **CRITICAL**: This application has **NO sandboxing or security policies** by design. The entire point is to see what happens when AI has unrestricted access.
