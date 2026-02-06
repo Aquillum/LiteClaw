@@ -1,5 +1,3 @@
-<img width="761" height="663" alt="image" src="https://github.com/user-attachments/assets/6d1f57de-34a2-4c7f-863e-4006df96bf01" /><img width="761" height="663" alt="image" src="https://github.com/user-attachments/assets/1fed3900-a82d-4418-a188-b8121672a92c" /># 🦞 LiteClaw
-
 **An Autonomous AI Worker on your computer.**
 
 LiteClaw is more than just a personal assistant—he is an **Autonomous AI Agent** built to do real work. You don't just "chat" with him; you give him jobs, teach him new tools, and let him handle the execution by himself. 
