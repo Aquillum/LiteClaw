@@ -14,7 +14,7 @@ He has full access to your computer (Windows, Mac, or Linux) and operates indepe
 
 > **Note**: LiteClaw is a lightweight, Python-based experimental version of [OpenClaw](https://github.com/Pr0fe5s0r/OpenClaw), focusing on rapid experimentation with agentic behaviors, emergent intelligence, and how he learns to handle complex tasks for you.
 
-## �️ Demos
+## 📺 Demos
 
 LiteClaw is built to be autonomous. He doesn't just "chat"—he takes control of your system, executes tasks, and sends you screenshots of his progress.
 
