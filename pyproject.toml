@@ -28,7 +28,8 @@ dependencies = [
     "click",
     "apscheduler",
     "pyautogui",
-    "Pillow"
+    "Pillow",
+    "boto3"
 ]
 
 [project.scripts]

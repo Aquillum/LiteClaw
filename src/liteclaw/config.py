@@ -20,12 +20,17 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = ""  # Allow empty during onboarding
     LLM_MODEL: str = "gpt-4o"
     LLM_BASE_URL: Optional[str] = None
+    # Optional: used by some OpenAI-compatible providers
+    LLM_API_VERSION: Optional[str] = None
     
     # Vision LLM (for Vision Agent) - Falls back to Main LLM if not set
     VISION_LLM_PROVIDER: Optional[str] = None
     VISION_LLM_MODEL: Optional[str] = None
     VISION_LLM_API_KEY: Optional[str] = None
     VISION_LLM_BASE_URL: Optional[str] = None
+    
+    # AWS / Bedrock (API key flow)
+    AWS_REGION_NAME: Optional[str] = None
     
     # WhatsApp Config (Selenium/Node)
     WHATSAPP_TYPE: str = "selenium" # or "cloud_api" or "node_bridge"
