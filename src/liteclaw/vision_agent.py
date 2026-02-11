@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from collections import deque
 import threading
 from .config import settings
+from .llm import get_full_model_name, configure_bedrock_env
 
 # Third-party imports
 pyautogui = None
@@ -27,16 +28,13 @@ try:
             pyautogui.size()
         except Exception as e:
             print(f"Warning: Vision libraries loaded but Display not available: {e}")
-            pyautogui = None # Disable vision
+            pyautogui = None  # Disable vision
 except Exception as e:
     print(f"Warning: Vision features disabled. Initialization error: {e}")
     pyautogui = None
     pass
 
-try:
-    from openai import OpenAI
-except ImportError:
-    pass
+import litellm
 
 class VisionAgent:
     def __init__(self, goal: str, session_id: str, platform: str = "whatsapp", max_steps: int = 15):
@@ -47,15 +45,17 @@ class VisionAgent:
         self.history = []
         self.step_count = 0
         
-        # Initialize Client using LiteClaw Settings (Prioritize Vision Config)
+        # Initialize LLM settings (prioritize Vision-specific config)
+        self.provider = settings.VISION_LLM_PROVIDER or settings.LLM_PROVIDER
         self.model_name = settings.VISION_LLM_MODEL or settings.LLM_MODEL
-        api_key = settings.VISION_LLM_API_KEY or settings.LLM_API_KEY
-        base_url = settings.VISION_LLM_BASE_URL or settings.LLM_BASE_URL
-        
-        self.client = OpenAI(
-            base_url=base_url,
-            api_key=api_key
-        )
+        self.api_key = settings.VISION_LLM_API_KEY or settings.LLM_API_KEY
+        self.base_url = settings.VISION_LLM_BASE_URL or settings.LLM_BASE_URL
+
+        # Configure Bedrock environment if needed
+        configure_bedrock_env()
+
+        # Normalize model name for LiteLLM routing
+        self.full_model_name = get_full_model_name(self.provider, self.model_name, self.base_url)
         
         # Prepare screen info
         try:
@@ -457,20 +457,23 @@ Do not return markdown code blocks. Just the raw JSON string.
                     messages = [
                         {"role": "system", "content": self.get_system_prompt()},
                         {
-                            "role": "user", 
+                            "role": "user",
                             "content": [
                                 {"type": "text", "text": user_content_str},
                                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64_img}"}}
                             ]
                         }
                     ]
-                    
-                    response = self.client.chat.completions.create(
-                        model=self.model_name,
-                        messages=messages
+
+                    response = litellm.completion(
+                        model=self.full_model_name,
+                        messages=messages,
+                        api_key=self.api_key,
+                        base_url=self.base_url,
                     )
-                    
-                    content = response.choices[0].message.content
+
+                    # LiteLLM returns OpenAI-style responses
+                    content = response.choices[0].message["content"]
                     actions = self.parse_response(content)
                     
                     if not actions:
