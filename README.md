@@ -95,6 +95,7 @@ After onboarding, your config is stored in:
 | OpenRouter | `https://openrouter.ai/api/v1` |
 | Groq | `https://api.groq.com/openai/v1` |
 | DeepSeek | `https://api.deepseek.com/v1` |
+| Nebius AI Studio | `https://api.tokenfactory.nebius.com/v1` |
 | Ollama (Local) | `http://localhost:11434/v1` |
 
 ### WhatsApp Setup
