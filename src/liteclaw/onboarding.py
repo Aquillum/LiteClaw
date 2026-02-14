@@ -83,6 +83,20 @@ PROVIDERS = {
         ],
         "model_prefix": ""
     },
+    "Nebius AI Studio": {
+        "provider": "openai",
+        "base_url": "https://api.tokenfactory.nebius.com/v1",
+        "api_key_env": "NEBIUS_API_KEY",
+        "description": "High-performance GPU cloud with popular open models",
+        "models": [
+            "deepseek-ai/DeepSeek-R1-0528",
+            "deepseek-ai/DeepSeek-V3-0324",
+            "meta-llama/Llama-3.3-70B-Instruct",
+            "Qwen/Qwen3-235B-A22B",
+            "mistralai/Mistral-Nemo-Instruct-2407",
+        ],
+        "model_prefix": ""
+    },
     "Hugging Face": {
         "provider": "huggingface",
         "base_url": None, # Uses hub by default
