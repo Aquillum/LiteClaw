@@ -6,6 +6,7 @@ from .config import settings
 from .tools import execute_command, get_system_info
 from .memory import add_message, get_session_history
 from .meta_memory import get_soul_memory, update_soul_memory, get_personality_memory, update_personality_memory, get_subconscious_memory, get_learning_memory, AGENT_FILE
+from .llm import get_full_model_name, configure_bedrock_env
 
 import litellm
 import threading
@@ -380,20 +381,12 @@ class LiteClawAgent:
         self.api_key = settings.LLM_API_KEY
         self.base_url = settings.LLM_BASE_URL
         self.provider = settings.LLM_PROVIDER
-        
-        if self.provider == "openai":
-            if self.base_url and "api.openai.com" not in self.base_url:
-                # For OpenAI Proxies (like OpenRouter), we always prepend 'openai/' 
-                # to the model string so LiteLLM uses the OpenAI handler but 
-                # sends the full model name as expected by the proxy.
-                self.full_model_name = f"openai/{self.model}"
-            elif not self.model.startswith("openai/"):
-                # Normal OpenAI flow
-                self.full_model_name = f"openai/{self.model}"
-            else:
-                self.full_model_name = self.model
-        else:
-            self.full_model_name = self.model
+
+        # Configure Bedrock env if needed (no-op for other providers)
+        configure_bedrock_env()
+
+        # Normalize model name for LiteLLM routing
+        self.full_model_name = get_full_model_name(self.provider, self.model, self.base_url)
 
     def process_message(self, user_message: str, session_id: str = "default", platform: str = "whatsapp") -> str:
         # Check for Break Time

@@ -14,3 +14,4 @@ apscheduler
 click
 pyautogui
 Pillow
+boto3
