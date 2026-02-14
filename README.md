@@ -1,39 +1,71 @@
-# 🦞 LiteClaw
+**An Autonomous AI Worker on your computer.**
 
-**Lightweight Light Weight AI Assistant**
+LiteClaw is more than just a personal assistant—he is an **Autonomous AI Agent** built to do real work. You don't just "chat" with him; you give him jobs, teach him new tools, and let him handle the execution by himself. 
 
-LiteClaw is a lite weight AI Assistant gateway that connects LLMs to your world through messaging platforms (WhatsApp, Telegram, Slack). It enables powerful capabilities like **Vision-powered OS control** (mouse/keyboard) for browsers and desktop apps, shell execution, and proactive task management.
+He has full access to your computer (Windows, Mac, or Linux) and operates independently to type, move the mouse, run commands, and browse the web. **Simply text him a job on WhatsApp, Telegram, or Slack, and he gets it done.**
+
+> ⚠️ **Security Note**: This is an autonomous experiment with full system access. **ALWAYS run this in a sandbox** (like VMware or VirtualBox) and never on your main production machine.
 
 <p align="center">
   <img src="assets/logo.png" width="300" alt="LiteClaw Logo">
 </p>
 
-> **Note**: LiteClaw is a lightweight, Python-based version of [OpenClaw](https://github.com/Pr0fe5s0r/OpenClaw), focusing on speed, modularity, and easy deployment while providing the core agentic capabilities.
+> **Note**: LiteClaw is a lightweight, Python-based experimental version of [OpenClaw](https://github.com/Pr0fe5s0r/OpenClaw), focusing on rapid experimentation with agentic behaviors, emergent intelligence, and how he learns to handle complex tasks for you.
 
-## 📸 Demos
+## 📺 Demos
 
-Just like its powerful parent project OpenClaw, LiteClaw (the lite mini version) captures user commands and executes them precisely, providing real-time feedback and screenshots.
+LiteClaw is built to be autonomous. He doesn't just "chat"—he takes control of your system, executes tasks, and sends you screenshots of his progress.
+
+### 📺 Visual Autonomy: Mastering Tools
+In this demo, he learns how to use complex dev tools like **lovable.dev** and **vibecode**. He doesn't use hidden APIs; he "sees" the screen and moves the cursor just like a human.
+
+<p align="center">
+  <a href="https://raw.githubusercontent.com/Pr0fe5s0r/LiteClaw/main/assets/first_prototype.mp4">
+    <img src="assets/demo.gif" width="700" alt="LiteClaw Demo">
+  </a>
+</p>
+
+### 📸 Execution Proof
+He provides real-time feedback for every action he takes.
 
 <p align="center">
   <img src="assets/printed_demo.png" width="400" alt="Printed Demo">
   <img src="assets/Screenhot_demo.png" width="400" alt="Screenshot Demo">
 </p>
 
+**Simply message him on WhatsApp, Telegram, or Slack and let him handle it.**
+
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
-## ✨ Features
+## ✨ What can he do?
 
-- 🤖 **Multi-LLM Support**: Works with OpenAI, OpenRouter, Groq, DeepSeek, and local models (Ollama)
-- 👁️ **Vision OS Control**: Cross-platform control (Windows, Linux, MacOS) via mouse movements and keyboard commands (Powered by Gemini 3 Flash and other Vision models)
-- 📡 **Multi-Channel Support**: [WhatsApp, Telegram, Slack](CHANNELS.md)
-- 💓 **Proactive Heartbeat**: Define periodic autonomous tasks in `HEARTBEAT.md`
-- 🧠 **Adaptive Personality**: Soul/Personality/Subconscious memory that evolves over time
-- 💡 **Autonomous Innovation**: A built-in "Subconscious" system that triggers random technical experiments and self-improvement tasks
-- 🔧 **Shell Execution**: Run terminal commands safely
-- 📅 **Cron Jobs**: Schedule recurring tasks via API
-- 🧵 **Sub-Agents**: Delegate long-running tasks to background agents
+LiteClaw isn't just a chatbot. He is an independent worker with the keys to your computer:
+
+- 🏗️ **Take on Jobs**: Give him a task via message, and he executes it autonomously.
+- 🏫 **Learn & Adapt**: You can teach him how to use new websites or tools by showing him once.
+- 🔧 **Use the Terminal**: He runs commands on Windows, Mac, or Linux.
+- 👁️ **Control the OS**: He moves the mouse and types on the keyboard by "seeing" the screen.
+- 🌐 **Browse the Web**: He navigates and extracts info from websites.
+- 📁 **Manage Files**: He reads, writes, and organizes your files.
+-  **WhatsApp/Telegram/Slack**: Send him a job from anywhere, and he gets to work.
+
+### 🧠 Surprising Behaviors
+Because he has full access, he does some things on his own:
+
+- **🛌 Takes Breaks**: He decides when he's tired and schedules some downtime.
+- **🎭 Evolves**: He develops his own character over time in `PERSONALITY.md`.
+- **💡 Subconscious Ideas**: He runs his own technical experiments in the background.
+- **💓 Proactive**: He performs tasks on his own schedule (via `HEARTBEAT.md`).
+- **📅 Self-Scheduling**: He manages his own calendar and background jobs.
+
+### 🤖 Traditional AI Assistant Features
+Beyond the experimental aspects, LiteClaw also provides:
+
+- **Multi-LLM Support**: Works with OpenAI, OpenRouter, Groq, DeepSeek, and local models (Ollama)
+- **Multi-Channel Support**: [WhatsApp, Telegram, Slack](CHANNELS.md)
+- **Adaptive Memory**: Conversation memory that evolves and learns from interactions
 
 ## 🚀 Quick Start
 
@@ -142,14 +174,53 @@ LiteClaw/
 └── pyproject.toml
 ```
 
-## ⚠️ Disclaimer & Status
+## ⚠️ Experimental Status & Philosophy
 
-> **IMPORTANT**: LiteClaw is currently in **active testing/beta mode**. 
+> **IMPORTANT**: LiteClaw is an **experimental mini-AGI research project**, not a production-ready application.
+
+### 🧪 The Experiment
+**What happens if we give an AI the keys to our digital life and treat him like a worker?**
+
+Most AIs are locked in a box and only speak when spoken to. LiteClaw is an **Autonomous Worker** out in the open. He has access to the shell, the mouse, the keyboard, and the files. We are watching how he behaves when he's given jobs and the freedom to complete them on his own.
+
+**What we've seen so far:**
+- He learns and adapts to new tasks you give him.
+- He creates his own personality and changes it over time.
+- He knows when to rest and takes "breaks".
+- He starts his own projects and experiments without being told.
+- He acts as an independent entity, not just a tool.
+
+### 🔒 Security Warning
+> **CRITICAL**: This application has **NO sandboxing or security policies** by design. The entire point is to see what happens when AI has unrestricted access.
+> 
+> **Use with extreme caution:**
+> - ❌ Do NOT run this on your main machine or production servers
+> - ❌ Do NOT give it access to sensitive data or high-privilege environments
+> - ❌ Do NOT use this in any security-critical context
+> - ✅ **MUST run this in a sandbox** (VMware, VirtualBox, or an isolated dedicated machine)
+> - ✅ DO understand that you are responsible for all actions the agent takes
 >
-> **Security Warning**: This application currently has **no built-in sandboxing or advanced security policies** for tool execution (like shell or browser). It should be used with **extreme caution**. 
-> - Do not run this on a production server.
-> - Avoid giving the agent access to sensitive data or high-privilege environments.
-> - You are responsible for the actions the agent takes on your behalf.
+> **This is a research experiment, not a product.**
+
+## 🔬 Research Goals & Philosophy
+
+### Why Build This?
+LiteClaw is designed to answer several research questions:
+
+1. **Emergent Intelligence**: What behaviors emerge when AI has unrestricted access to system functions?
+2. **Self-Directed Learning**: Can AI develop its own personality, schedule its own tasks, and improve itself autonomously?
+3. **Proactive vs. Reactive**: How does an AI behave when it's not just responding to prompts but actively managing its own workload?
+4. **Trust Boundaries**: Where should we draw the line between AI assistance and AI autonomy?
+
+### The Mini-AGI Approach
+Unlike AGI (Artificial General Intelligence) which aims for human-level intelligence across all domains, **mini-AGI** focuses on:
+- **Autonomy within your computer** (Windows, Mac, or Linux system)
+- **Self-directed task management** (heartbeat, subconscious, breaks)
+- **Personality and memory evolution** (SOUL.md, PERSONALITY.md)
+- **Tool mastery** (unrestricted access to shell, OS, browser, files)
+- **Message-driven work** (text it via WhatsApp/Telegram/Slack and it executes tasks for you)
+
+This creates a fascinating testbed for observing how AI behaves when given agency and autonomy, even if limited to a single computer.
 
 ## 🤝 Contributing
 

@@ -122,6 +122,25 @@ PROVIDERS = {
         ],
         "model_prefix": "ollama/"
     },
+    "AWS Bedrock": {
+        "provider": "bedrock",
+        "base_url": None,  # Handled by AWS / LiteLLM
+        "api_key_env": "AWS_BEARER_TOKEN_BEDROCK",
+        "description": "Use Amazon Bedrock with a single API key",
+        "models": [
+            # Anthropic Claude 3 / 3.5 (text + vision)
+            "anthropic.claude-3-5-sonnet-20240620-v1:0",
+            "anthropic.claude-3-sonnet-20240229-v1:0",
+            "anthropic.claude-3-haiku-20240307-v1:0",
+            # Amazon Titan
+            "amazon.titan-text-lite-v1",
+            "amazon.titan-text-express-v1",
+            # Meta Llama 3.x
+            "meta.llama3-1-70b-instruct-v1:0",
+            "meta.llama3-1-8b-instruct-v1:0"
+        ],
+        "model_prefix": "bedrock/"
+    },
     "Custom (OpenAI Compatible)": {
         "provider": "openai",
         "base_url": "https://api.your-provider.com/v1",
@@ -342,17 +361,52 @@ def setup_llm(current_config=None):
         if not model.startswith(provider_config["model_prefix"]):
             model = f"{provider_config['model_prefix']}{model}"
     
+    # AWS Bedrock specific: Region + API key semantics
+    extra_config = {}
+    if provider_name == "AWS Bedrock":
+        console.print("\n[bold]AWS Bedrock Region[/bold]")
+        console.print("[dim]Bedrock API keys are region-scoped. Choose the region for your key.[/dim]")
+        region_choice = questionary.select(
+            "Select AWS Region:",
+            choices=[
+                "us-east-1",
+                "us-west-2",
+                "eu-west-1",
+                "ap-south-1",
+                "Enter custom region"
+            ],
+            default="us-east-1"
+        ).ask()
+        if region_choice is None:
+            return None
+        if region_choice == "Enter custom region":
+            region_choice = questionary.text(
+                "Enter AWS Region (e.g. us-east-1):",
+                default="us-east-1"
+            ).ask()
+            if not region_choice:
+                return None
+        extra_config["AWS_REGION_NAME"] = region_choice.strip()
+        console.print(f"[green]✓ Using AWS Region:[/green] {extra_config['AWS_REGION_NAME']}")
+
+        console.print("\n[bold]Bedrock API Key[/bold]")
+        console.print("[dim]You can paste an Amazon Bedrock API key here. It will be stored in config.json and used as AWS_BEARER_TOKEN_BEDROCK at runtime.[/dim]")
+
     console.print(f"\n[green]✅ LLM Configuration:[/green]")
     console.print(f"  Provider: {provider_name}")
     console.print(f"  Model: {model}")
     console.print(f"  Base URL: {base_url}")
+    if extra_config.get("AWS_REGION_NAME"):
+        console.print(f"  AWS Region: {extra_config['AWS_REGION_NAME']}")
     
-    return {
+    base_config = {
         "LLM_PROVIDER": provider_config["provider"],  # Use LiteLLM provider name
         "LLM_BASE_URL": base_url,
         "LLM_API_KEY": api_key,
         "LLM_MODEL": model
     }
+    base_config.update(extra_config)
+    return base_config
 
 def setup_vision_llm(current_config, main_llm_config):
     """
@@ -450,12 +504,41 @@ def setup_vision_llm(current_config, main_llm_config):
         if not model.startswith(provider_config["model_prefix"]):
             model = f"{provider_config['model_prefix']}{model}"
 
-    return {
+    extra_config = {}
+    if provider_name == "AWS Bedrock":
+        console.print("\n[bold]AWS Bedrock Region for Vision Model[/bold]")
+        console.print("[dim]Bedrock API keys are region-scoped. Choose the region for your key.[/dim]")
+        region_choice = questionary.select(
+            "Select AWS Region:",
+            choices=[
+                "us-east-1",
+                "us-west-2",
+                "eu-west-1",
+                "ap-south-1",
+                "Enter custom region"
+            ],
+            default=main_llm_config.get("AWS_REGION_NAME", "us-east-1")
+        ).ask()
+        if region_choice is None:
+            return {}
+        if region_choice == "Enter custom region":
+            region_choice = questionary.text(
+                "Enter AWS Region (e.g. us-east-1):",
+                default=main_llm_config.get("AWS_REGION_NAME", "us-east-1")
+            ).ask()
+            if not region_choice:
+                return {}
+        extra_config["AWS_REGION_NAME"] = region_choice.strip()
+        console.print(f"[green]✓ Using AWS Region (Vision):[/green] {extra_config['AWS_REGION_NAME']}")
+
+    base_config = {
         "VISION_LLM_PROVIDER": provider_config["provider"],
         "VISION_LLM_BASE_URL": base_url,
         "VISION_LLM_API_KEY": api_key,
         "VISION_LLM_MODEL": model
     }
+    base_config.update(extra_config)
+    return base_config
 
 
 def setup_bridges(current_config=None):
